@@ -1,0 +1,27 @@
+# Назначение файла: исключить секреты, входные материалы и результаты выполнения.
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+runtime/
+secrets/
+inputs/
+corpus/
+dev_gold/
+weights/
+*.pem
+*.key
+*.pdf
+*.zip
+*.dump
+*.sqlite*
+infra/krakend.json
+infra/nginx.production.conf
+infra/keys/
+.release-image
+*-smoke.json
+image-digest.txt

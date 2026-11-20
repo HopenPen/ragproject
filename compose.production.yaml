@@ -1,0 +1,62 @@
+# Назначение файла: production image по digest, TLS и mounted secret files.
+x-secrets: &app-secrets
+  - database_url
+  - rabbitmq_url
+  - gateway_secret
+  - s3_access_key
+  - s3_secret_key
+  - openai_api_key
+  - admin_password
+x-env: &secret-env
+  ENVIRONMENT: production
+  DATABASE_URL_FILE: /run/secrets/database_url
+  RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
+  GATEWAY_SECRET_FILE: /run/secrets/gateway_secret
+  S3_ACCESS_KEY_FILE: /run/secrets/s3_access_key
+  S3_SECRET_KEY_FILE: /run/secrets/s3_secret_key
+  OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+  ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+services:
+  minio:
+    image: ${MINIO_IMAGE:?Set immutable MinIO registry digest}
+    mem_limit: 1g
+    cpus: 1
+  init:
+    image: ${APP_IMAGE:?Set immutable registry image digest}
+    environment: *secret-env
+    secrets: *app-secrets
+  auth:
+    image: ${APP_IMAGE:?Set immutable registry image digest}
+    environment:
+      <<: *secret-env
+      APP_MODE: auth
+    secrets: *app-secrets
+    mem_limit: 512m
+    cpus: 1
+  backend:
+    image: ${APP_IMAGE:?Set immutable registry image digest}
+    environment:
+      <<: *secret-env
+      APP_MODE: backend
+    secrets: *app-secrets
+    mem_limit: 1g
+    cpus: 1
+  worker:
+    image: ${APP_IMAGE:?Set immutable registry image digest}
+    environment: *secret-env
+    secrets: *app-secrets
+    mem_limit: 3g
+    cpus: 2
+  nginx:
+    ports: !override ['80:80', '443:443']
+    volumes: !override
+      - ./infra/nginx.production.conf:/etc/nginx/nginx.conf:ro
+      - ./secrets/tls:/etc/nginx/tls:ro
+secrets:
+  database_url: {file: ./secrets/database_url}
+  rabbitmq_url: {file: ./secrets/rabbitmq_url}
+  gateway_secret: {file: ./secrets/gateway_secret}
+  s3_access_key: {file: ./secrets/s3_access_key}
+  s3_secret_key: {file: ./secrets/s3_secret_key}
+  openai_api_key: {file: ./secrets/openai_api_key}
+  admin_password: {file: ./secrets/admin_password}

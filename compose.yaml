@@ -1,0 +1,137 @@
+# Назначение файла: private Compose, два FastAPI процесса, один image и persistent volumes.
+name: science-extract
+x-app: &app
+  image: ${APP_IMAGE:-science-extract:local}
+  build:
+    context: .
+    target: app
+  env_file: .env
+  restart: unless-stopped
+  networks: [private]
+  volumes:
+    - runtime:/runtime
+    - ${INPUTS_PATH:-./inputs}:/inputs:ro
+  security_opt: [no-new-privileges:true]
+services:
+  postgres:
+    image: postgres:15.12-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-science}
+      POSTGRES_USER: ${POSTGRES_USER:-science}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres:/var/lib/postgresql/data]
+    networks: [private]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      retries: 20
+  redis:
+    image: redis:7.4.3-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis:/data]
+    networks: [private]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      retries: 10
+  rabbitmq:
+    image: rabbitmq:4.1.0-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-science}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-science}
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+      - ./infra/rabbitmq.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks: [private]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      retries: 15
+  minio:
+    image: ${MINIO_IMAGE:-science-extract-minio:2025-10-15}
+    build:
+      context: .
+      target: minio
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?Set S3_SECRET_KEY}
+    volumes: [minio:/data]
+    networks: [private]
+    restart: unless-stopped
+  init:
+    <<: *app
+    restart: 'no'
+    command: [python, -m, tools.manage, init]
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_started}
+    volumes:
+      - keys:/keys
+      - public-keys:/public-keys
+      - gateway:/gateway
+      - runtime:/runtime
+  auth:
+    <<: *app
+    environment: {APP_MODE: auth}
+    volumes:
+      - keys:/keys:ro
+      - public-keys:/public-keys:ro
+    depends_on:
+      init: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck: &http-health
+      test: [CMD, curl, -fsS, http://localhost:8000/health/ready]
+      interval: 10s
+      retries: 15
+  backend:
+    <<: *app
+    environment: {APP_MODE: backend}
+    depends_on:
+      init: {condition: service_completed_successfully}
+    healthcheck: *http-health
+  worker:
+    <<: *app
+    command: [celery, -A, app.worker:celery, worker, --loglevel=INFO, --concurrency=1, -Q, work, --hostname=worker@science]
+    depends_on:
+      init: {condition: service_completed_successfully}
+      rabbitmq: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, celery, -A, app.worker:celery, inspect, ping, -d, worker@science, --timeout=5]
+      interval: 30s
+      retries: 5
+  krakend:
+    image: devopsfaith/krakend:2.9.3
+    user: '10001:10001'
+    command: [run, -c, /etc/krakend/krakend.json]
+    volumes:
+      - gateway:/etc/krakend:ro
+      - public-keys:/public-keys:ro
+    networks: [private]
+    restart: unless-stopped
+    depends_on:
+      auth: {condition: service_healthy}
+      backend: {condition: service_healthy}
+  nginx:
+    image: nginx:1.28.0-alpine
+    volumes: ['./infra/nginx.conf:/etc/nginx/nginx.conf:ro']
+    ports: ['${INGRESS_HOST:-0.0.0.0}:${INGRESS_PORT:-80}:80']
+    networks: [private]
+    restart: unless-stopped
+    depends_on: [krakend]
+networks:
+  private: {}
+volumes:
+  postgres: {}
+  redis: {}
+  rabbitmq: {}
+  minio: {}
+  keys: {}
+  public-keys: {}
+  gateway: {}
+  runtime: {}

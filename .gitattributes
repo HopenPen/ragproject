@@ -1,0 +1,2 @@
+# Назначение файла: сохранять переносы LF в Linux scripts/config при Windows checkout.
+* text=auto eol=lf

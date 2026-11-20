@@ -1,0 +1,87 @@
+# Назначение файла: trusted Docker runner test/build, protected staging/production, smoke и backup schedule.
+stages: [test, build, deploy, smoke]
+default:
+  image: docker:28.1.1-cli
+  tags: [trusted-docker]
+variables:
+  DOCKER_BUILDKIT: '1'
+  COMPOSE_PROJECT_NAME: science-ci-$CI_PIPELINE_ID
+  APP_IMAGE: $CI_REGISTRY_IMAGE:test-$CI_PIPELINE_ID
+  INGRESS_HOST: '127.0.0.1'
+  INGRESS_PORT: '0'
+test:
+  stage: test
+  script:
+    - docker run --rm -v "$CI_PROJECT_DIR:/work" -w /work python:3.12.10-slim-bookworm python -c "import secrets,pathlib; p=pathlib.Path('.env.example'); d=p.read_text(); fields={'POSTGRES_PASSWORD','RABBITMQ_DEFAULT_PASS','S3_ACCESS_KEY','S3_SECRET_KEY','GATEWAY_SECRET','ADMIN_PASSWORD'}; vals={k:secrets.token_hex(24) for k in fields}; vals.update(ADMIN_EMAIL='admin@example.org'); vals['DATABASE_URL']='postgresql+psycopg://science:'+vals['POSTGRES_PASSWORD']+'@postgres/science'; vals['RABBITMQ_URL']='amqp://science:'+vals['RABBITMQ_DEFAULT_PASS']+'@rabbitmq:5672/science'; pathlib.Path('.env').write_text('\n'.join(k+'='+vals[k] if (k:=s.split('=',1)[0]) in vals else s for s in d.splitlines())+'\n')"
+    - docker compose build
+    - docker compose up -d --wait --wait-timeout 240
+    - docker compose exec -T -e RUN_INFRA_TESTS=1 backend pytest -q
+    - docker compose exec -T -e RUN_SIGNING_TESTS=1 auth pytest -q tests/test_integration.py::test_real_gateway_expired_wrong_issuer_audience_and_spoofing
+    - docker compose exec -T backend python -m tools.smoke --base-url http://nginx --output /runtime/ci-smoke.json --technical-only
+    - docker compose cp backend:/runtime/ci-smoke.json ci-smoke.json
+  after_script:
+    - docker compose down -v --remove-orphans
+  artifacts:
+    when: always
+    paths: [ci-smoke.json]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule"'
+build:
+  stage: build
+  script:
+    - printf '%s' "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - docker inspect --format='{{index .RepoDigests 0}}' "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" > image-digest.txt
+    - docker build --target minio -t "$CI_REGISTRY_IMAGE/minio:2025-10-15" .
+    - docker push "$CI_REGISTRY_IMAGE/minio:2025-10-15"
+    - docker inspect --format='{{index .RepoDigests 0}}' "$CI_REGISTRY_IMAGE/minio:2025-10-15" > minio-digest.txt
+  artifacts: {paths: [image-digest.txt, minio-digest.txt]}
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && ($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v/) && $CI_PIPELINE_SOURCE != "schedule"'
+.remote:
+  before_script:
+    - apk add --no-cache openssh-client
+    - install -m 700 -d ~/.ssh
+    - cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+    - chmod 600 "$DEPLOY_SSH_KEY"
+deploy:
+  extends: .remote
+  stage: deploy
+  resource_group: science-deploy
+  environment:
+    name: $DEPLOY_ENVIRONMENT
+  script:
+    - scp -i "$DEPLOY_SSH_KEY" compose.yaml compose.production.yaml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+    - scp -i "$DEPLOY_SSH_KEY" tools/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/deploy.sh"
+    - scp -i "$DEPLOY_SSH_KEY" infra/nginx.conf "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/infra/nginx.conf"
+    - printf '%s' "$DEPLOY_REGISTRY_PASSWORD" | ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && docker login '$CI_REGISTRY' -u '$DEPLOY_REGISTRY_USER' --password-stdin"
+    - ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && sh deploy.sh '$(cat image-digest.txt)' '$(cat minio-digest.txt)'"
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG =~ /^v/ && $CI_PIPELINE_SOURCE != "schedule"'
+      variables: {DEPLOY_ENVIRONMENT: production}
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"'
+      variables: {DEPLOY_ENVIRONMENT: staging}
+smoke:
+  extends: .remote
+  stage: smoke
+  environment:
+    name: $DEPLOY_ENVIRONMENT
+  script:
+    - ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && docker compose -f compose.yaml -f compose.production.yaml exec -T backend python -m tools.smoke --output /runtime/release-smoke.json --technical-only"
+    - ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && docker compose -f compose.yaml -f compose.production.yaml cp backend:/runtime/release-smoke.json /tmp/science-release-smoke.json"
+    - scp -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/science-release-smoke.json" release-smoke.json
+  artifacts: {when: always, paths: [release-smoke.json]}
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG =~ /^v/ && $CI_PIPELINE_SOURCE != "schedule"'
+      variables: {DEPLOY_ENVIRONMENT: production}
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"'
+      variables: {DEPLOY_ENVIRONMENT: staging}
+daily-backup:
+  extends: .remote
+  stage: deploy
+  resource_group: science-deploy
+  script:
+    - ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && docker compose -f compose.yaml -f compose.production.yaml exec -T backend python -m tools.manage backup --output /runtime/backups --daily"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_PROTECTED == "true"'

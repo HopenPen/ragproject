@@ -1,0 +1,16 @@
+# Назначение файла: исключить секреты, corpus и результаты из app image.
+.git
+.venv
+.env*
+runtime
+secrets
+inputs
+corpus
+dev_gold
+weights
+__pycache__
+.pytest_cache
+*.pdf
+*.pem
+*.key
+infra/krakend.json
