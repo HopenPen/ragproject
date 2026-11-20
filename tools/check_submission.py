@@ -29,5 +29,5 @@ if __name__ == '__main__':
     parser.add_argument('checker', type=Path); parser.add_argument('submission', type=Path); parser.add_argument('pdf', type=Path)
     args = parser.parse_args()
     result = run_checker(args.checker, args.submission, args.pdf)
-    print(json.dumps(result, ensure_ascii=False))
+    print(json.dumps(result, ensure_ascii=True))
     sys.exit(result.get('exit_code', 2))

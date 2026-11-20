@@ -130,3 +130,16 @@ def test_visual_source_requires_location_and_correct_artifact():
     report=source_checks(graph,[{'number':1,'text':'RAG F1 = 0.5 fraction.','width':600,'height':800}],
                          [{'id':'artifact','page':2,'content_type':'application/json'}])
     assert sum(i['severity']=='error' for i in report)==2
+
+
+def test_hi_needs_an_explicit_source_formula_and_comparable_scans():
+    graph=solar_graph()
+    graph['measurements'].append({**graph['measurements'][0],'measurement_id':'JV-reverse','scan_direction':'reverse'})
+    original=graph['results'][-1]
+    graph['results'].append({**original,'result_id':'PCE-reverse','measurement_id':'JV-reverse','metric_value':'20','normalized_value':'20','raw_value':'20'})
+    formula='HI=(PCE_reverse-PCE_forward)/PCE_reverse'
+    graph['results'].append({**original,'result_id':'HI','metric_name':'HI','metric_value':'25','normalized_value':'25','raw_value':'25','source_fragment':formula,'note':formula})
+    result=next(i for i in scientific(graph) if i['rule']=='hysteresis_index')
+    assert result['severity']=='needs_review' and Decimal(result['calculated_percent'])==50
+    graph['results'][-1]['note']=None
+    assert next(i for i in scientific(graph) if i['rule']=='hysteresis_index')['severity']=='skipped'

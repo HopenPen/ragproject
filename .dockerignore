@@ -14,3 +14,10 @@ __pycache__
 *.pem
 *.key
 infra/krakend.json
+*-smoke.json
+image-digest.txt
+minio-digest.txt
+.release*
+*.zip
+*.dump
+*.sqlite*

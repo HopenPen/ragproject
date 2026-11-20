@@ -25,3 +25,4 @@ infra/keys/
 .release-image
 *-smoke.json
 image-digest.txt
+minio-digest.txt

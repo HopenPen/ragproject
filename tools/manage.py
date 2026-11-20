@@ -54,7 +54,7 @@ def render_gateway(config, output):
             'allow_methods': ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
             'allow_headers': ['Authorization', 'Content-Type', 'If-Match', 'Idempotency-Key'],
             'expose_headers': ['ETag', 'Idempotency-Key', 'Content-Disposition', 'X-Request-ID'], 'allow_credentials': False}}
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temp = output.with_suffix('.new')
     temp.write_text(json.dumps(template), encoding='utf-8')
     temp.chmod(0o640)
@@ -173,6 +173,7 @@ def evaluate(predicted, gold, profile, tolerance=Decimal(0)):
     gpub = {r['publication_id']: r for r in load_csv(gold, 'publications')}
     shared = ppub.keys() & gpub.keys()
     return {'evaluator': 'project_defined_one_to_one_semantic_results', 'profile': profile,
+            'comparison_type': 'self_comparison_sanity_only' if predicted.resolve()==gold.resolve() else 'predicted_against_supplied_gold',
             'true_positives': matches, 'predicted': len(pred), 'gold': len(truth), 'precision': precision, 'recall': recall, 'f1': f1,
             'scope': {'correct': sum(ppub[k]['in_scope'] == gpub[k]['in_scope'] for k in shared), 'compared': len(shared)},
             'classification': {'status': 'not_available_in_csv', 'reason': 'CSV scope is not topic classification'},
@@ -196,10 +197,12 @@ def backup(config, output):
     from app.repositories.data import TABLES
     if output.exists():
         raise ValueError('Backup destination exists')
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     storage = Storage(config)
     args, env = pg_connection(config)
     temp_output = output.with_suffix('.partial')
+    with temp_output.open('xb'):
+        temp_output.chmod(0o600)
     with tempfile.TemporaryDirectory() as temp, engine().connect().execution_options(isolation_level='REPEATABLE READ') as conn:
         with conn.begin():
             conn.execute(text('LOCK TABLE '+','.join(TABLES)+' IN SHARE MODE'))
@@ -215,7 +218,8 @@ def backup(config, output):
                         key = obj['Key']; blob = storage.get(key)
                         name = 'objects/'+hashlib.sha256(key.encode()).hexdigest()
                         archive.writestr(name, blob)
-                        manifest['objects'].append({'key': key, 'entry': name, 'sha256': hashlib.sha256(blob).hexdigest()})
+                        content_type=storage.client.head_object(Bucket=config.s3_bucket,Key=key).get('ContentType','application/octet-stream')
+                        manifest['objects'].append({'key': key, 'entry': name, 'sha256': hashlib.sha256(blob).hexdigest(), 'content_type':content_type})
                 archive.writestr('manifest.json', json.dumps(manifest))
     temp_output.chmod(0o600)
     temp_output.replace(output)
@@ -248,7 +252,7 @@ def restore(config, source):
         path = Path(temp)/'database.dump'; path.write_bytes(dump)
         subprocess.run(['pg_restore', *args, '--no-owner', '--no-privileges', '--single-transaction', str(path)], env=env, check=True, timeout=300)
         for item in manifest['objects']:
-            storage.put(item['key'], archive.read(item['entry']), 'application/octet-stream')
+            storage.put(item['key'], archive.read(item['entry']), item.get('content_type','application/octet-stream'))
         # Read every restored object back before declaring success.
         for item in manifest['objects']:
             if hashlib.sha256(storage.get(item['key'])).hexdigest() != item['sha256']:
@@ -306,7 +310,7 @@ def main():
         result = backup(config, output)
     elif args.command == 'restore':
         result = restore(config, args.source)
-    print(json.dumps(result, ensure_ascii=False, default=str))
+    print(json.dumps(result, ensure_ascii=True, default=str))
 
 
 if __name__ == '__main__':

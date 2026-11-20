@@ -36,11 +36,11 @@ def csv_columns(profile):
 
 def rules(profile):
     common = ['schema', 'links', 'duplicate_cycles', 'source', 'normalization', 'contradiction']
-    defined = (['jv_consistency', 'voc_limit', 'eqe_consistency', 'champion_vs_mean', 'comparability'] if profile == 'solar-v1'
+    defined = (['jv_consistency', 'voc_limit', 'eqe_consistency', 'champion_vs_mean', 'hysteresis_index', 'comparability'] if profile == 'solar-v1'
                else ['metric_scale', 'metric_k', 'protocol_mismatch', 'baseline_comparability'])
     result = [{'rule': x, 'version': RULES_VERSION, 'status': 'project_defined', 'applicability': 'requires explicit source conditions'} for x in common + defined]
     if profile == 'solar-v1':
-        result += [{'rule': x, 'version': RULES_VERSION, 'status': 'awaiting_definition'} for x in ('official_Jsc_limits', 'official_FF_limits', 'official_PCE_limits', 'hysteresis_index_formula')]
+        result += [{'rule': x, 'version': RULES_VERSION, 'status': 'awaiting_definition'} for x in ('official_Jsc_limits', 'official_FF_limits', 'official_PCE_limits')]
     return {'rules': result, 'thresholds': {'jv_relative': '0.03', 'eqe_relative': '0.05'} if profile == 'solar-v1' else {}}
 
 

@@ -228,3 +228,12 @@ def test_model_cannot_confirm_its_own_sources():
     assert source['review']=='open' and source['review_reason'] is None
     graph['evidence'][0]['method']='manual'
     with pytest.raises(Error):machine_evidence(graph)
+
+
+def test_archiving_cancels_pending_runs_before_any_activation(env,corpus):
+    job,items=enqueue(env,corpus)
+    env.rt.documents.patch_corpus(env.actors['editor'],corpus.corpus['id'],{'archived':True})
+    Runner(Uow,env.storage,ModelDouble(),env.config).run(items[0]['id'])
+    with Uow() as u:
+        assert u.repo.get('jobs',job['id'])['status']=='cancelled'
+        assert not u.repo.get('publications',corpus.pub['id'])['current']

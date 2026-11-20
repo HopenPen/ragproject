@@ -236,6 +236,35 @@ def scientific(graph):
                     findings.append(issue('eqe_consistency', 'EQE/JV currents under explicit matching illumination differ by more than 5%',
                         [eqe['result_id'],jv['result_id']], relative_difference=str(abs(Decimal(eqe['normalized_value'])-v)/abs(v))))
         findings += [issue(r['rule'], 'Official definition is not supplied', severity='skipped', definition_status='awaiting_definition') for r in rules('solar-v1')['rules'] if r['status'] == 'awaiting_definition']
+        for hi in [r for r in results if r['metric_name']=='HI']:
+            formula='hi=(pce_reverse-pce_forward)/pce_reverse'
+            cited_formula=re.sub(r'\s+','', (hi.get('note') or '')).casefold()
+            source_formula=re.sub(r'\s+','', ' '.join([hi.get('source_fragment') or '']+
+                [e.get('fragment') or '' for e in graph['evidence'] if e['entity_id']==hi['result_id']])).casefold()
+            if formula not in cited_formula or formula not in source_formula:
+                findings.append(issue('hysteresis_index','No supported explicit source formula; HI is not recalculated',[hi['result_id']],'skipped',definition_status='source_formula_required'))
+                continue
+            candidates={'forward':[],'reverse':[]}
+            for pce in [r for r in results if r['metric_name']=='PCE']:
+                if any(pce[k]!=hi[k] for k in ('device_id','aggregation','time_point','time_unit')):
+                    continue
+                measurement=measurements.get(pce['measurement_id'],{})
+                direction=measurement.get('scan_direction')
+                if direction in candidates:
+                    candidates[direction].append((pce,measurement))
+            if any(len(v)!=1 for v in candidates.values()):
+                findings.append(issue('hysteresis_index','Unique matching forward/reverse PCE measurements are unavailable',[hi['result_id']],'skipped'))
+                continue
+            fwd,mf=candidates['forward'][0];rev,mr=candidates['reverse'][0]
+            fields=('spectrum','light_intensity','intensity_unit')
+            denominator=Decimal(rev['normalized_value'])
+            if not denominator or any(mf.get(k) is None or mf[k]!=mr.get(k) for k in fields):
+                findings.append(issue('hysteresis_index','Illumination comparability or a nonzero reverse PCE is unavailable',[hi['result_id']],'skipped'))
+                continue
+            calculated=100*(denominator-Decimal(fwd['normalized_value']))/denominator
+            if calculated!=Decimal(hi['normalized_value']):
+                findings.append(issue('hysteresis_index','HI differs from the explicitly sourced formula; rounding/tolerance requires review',
+                    [hi['result_id'],fwd['result_id'],rev['result_id']],'needs_review',formula=formula,calculated_percent=str(calculated),reported_percent=hi['normalized_value']))
     else:
         for r in results:
             val = Decimal(r['normalized_value'])

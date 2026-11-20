@@ -44,6 +44,8 @@ class ResponsesModel:
             'Keep different conditions, scans, samples, mean/champion, dataset versions and literature results separate. '
             'Solar: experimental single-junction thin-film devices only are in_scope; simulated/tandem may be solar but excluded. '
             'RAG: external retrieval used in generation, configuration plus evaluation needed for in_scope. top_k is not metric_k. '
+            'A baseline reproduced by the article authors is primary; a number quoted from another paper is cited. '
+            'Cited solar results must have null device_id and measurement_id. Never mark evidence as manually reviewed or confirmed. '
             'Use stable entity ids consistent with existing_graph. Return the full updated graph for extraction, preserving prior page facts. '
             'For classification return page-batch observations; do not infer outside merely from scope=false. '
             'For excluded graphs leave all subject collections empty. Evidence entity ids and links stay within this profile/publication.')

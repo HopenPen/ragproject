@@ -1,7 +1,7 @@
 import copy
 import re
 from decimal import Decimal
-from app.domain import Error, corpus_access, require_editor, precondition, uid, decimal_value, digest
+from app.domain import Error, corpus_access, require_editor, precondition, uid, decimal_value, digest, TERMINAL
 from app.profiles import ENTITIES, GRAPHS
 from app.schemas.graphs import Evidence, Bibliography, Scope
 from app.services.validation import enforce_graph, structural, comparison_key, source_checks
@@ -35,6 +35,8 @@ def selected_revision(repo, pub, profile=None, revision=None):
     if profile not in GRAPHS:
         raise Error(422, 'unknown_profile', 'Unknown profile')
     rid = revision or pub['current'].get(profile)
+    if not revision and not rid and pub['current']:
+        raise Error(409, 'profile_not_active', 'Requested profile has no active graph')
     rev = repo.get('publication_revisions', rid) if rid else None
     if not rev or rev['publication_id'] != pub['id']:
         raise Error(404, 'not_found', 'Revision not found')
@@ -111,6 +113,17 @@ class Documents:
             corpus = corpus_access(u.repo.get('corpora', id, lock=True), actor, True)
             if 'split' in values and values['split'] != corpus['split'] and u.repo.find('documents', corpus_id=id):
                 raise Error(409, 'split_immutable', 'Split cannot change after upload')
+            if values.get('archived'):
+                from app.services.pipeline import aggregate
+                for job in u.repo.find('jobs',corpus_id=id):
+                    job=u.repo.get('jobs',job['id'],lock=True)
+                    if job['status'] in TERMINAL:
+                        continue
+                    u.repo.update('jobs',job['id'],status='cancel_requested')
+                    for item in u.repo.find('job_items',job_id=job['id']):
+                        if item['status'] in ('queued','waiting_review'):
+                            u.repo.update('job_items',item['id'],status='cancelled')
+                    aggregate(u.repo,job['id'])
             result = u.repo.update('corpora', id, **values, revision=corpus['revision']+1)
             u.commit()
             return result
