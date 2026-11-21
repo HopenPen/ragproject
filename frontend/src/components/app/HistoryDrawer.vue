@@ -73,36 +73,38 @@ async function activate (v) {
           <b class="num">Версия {{ v.number }}</b>
           <Chip :tone="STATUS[v.status]?.tone" :text="STATUS[v.status]?.text || v.status" />
           <span class="grow" />
-          <span class="faint">{{ fmtDate(v.created_at) }}</span>
+          <span class="hist__date">{{ fmtDate(v.created_at) }}</span>
         </div>
         <p class="hist__who">{{ ORIGIN[v.origin] || v.origin }}<template v-if="v.origin === 'manual'">: {{ v.author_name }}</template><template v-if="v.model_id">, {{ v.model_id }}</template></p>
         <p v-if="v.reason" class="hist__reason">{{ v.reason }}</p>
-        <p v-if="v.diff_from_active" class="hist__diff muted">{{ diffText(v.diff_from_active) }}</p>
+        <p v-if="v.diff_from_active" class="hist__diff">{{ diffText(v.diff_from_active) }}</p>
         <button v-if="v.status === 'candidate' && editable" class="btn btn--sm btn--primary hist__btn" type="button" :disabled="busy" @click="activate(v)">Сделать активной</button>
       </li>
     </ol>
     <ol v-else class="hist">
       <li v-for="a in audit" :key="a.id" class="hist__item">
-        <div class="hist__top"><b>{{ ACTION[a.action] || a.action }}</b><span class="grow" /><span class="faint">{{ fmtDate(a.at) }}</span></div>
+        <div class="hist__top"><b>{{ ACTION[a.action] || a.action }}</b><span class="grow" /><span class="hist__date">{{ fmtDate(a.at) }}</span></div>
         <p class="hist__who">{{ a.actor }}<template v-if="a.target">, {{ a.target }}</template></p>
         <p v-if="a.reason" class="hist__reason">{{ a.reason }}</p>
       </li>
-      <li v-if="!audit.length" class="muted">Записей нет.</li>
+      <li v-if="!audit.length" class="hist__none">Записей нет.</li>
     </ol>
   </Drawer>
 </template>
 
 <style>
-.hist__sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
-.hist { margin-top: 12px; display: flex; flex-direction: column; }
-.hist__item { position: relative; padding: 10px 0 14px 20px; box-shadow: inset 1px 0 0 var(--u-line-2); margin-left: 4px; }
-.hist__item::before { content: ""; position: absolute; left: -4px; top: 16px; width: 9px; height: 9px; border-radius: 50%; background: var(--u-bg); box-shadow: inset 0 0 0 1.5px var(--u-soft); }
-.hist__item.is-active::before { background: var(--u-accent); box-shadow: none; }
-.hist__top { display: flex; align-items: center; gap: 10px; }
-.hist__top b, .hist__top strong { font-weight: 500; }
-.hist__top .faint { font-size: 12px; }
-.hist__who { margin-top: 2px; color: var(--u-text-2); }
-.hist__reason { margin-top: 4px; color: var(--u-muted); }
-.hist__diff { margin-top: 4px; font-size: 12px; line-height: 16px; }
-.hist__btn { margin-top: 10px; }
+.hist__sub { margin-top: 2px; color: var(--pencil); }
+.hist { margin-top: 14px; box-shadow: inset 0 1.5px 0 var(--rule-strong); }
+.hist__item { padding: 14px 0 16px; }
+.hist__item + .hist__item { box-shadow: inset 0 1px 0 var(--rule); }
+.hist__item.is-active { position: relative; }
+.hist__item.is-active::before { content: ""; position: absolute; left: -12px; top: 16px; bottom: 18px; width: 2px; border-radius: 1px; background: #07854A; }
+.hist__top { display: flex; align-items: baseline; gap: 12px; }
+.hist__top b { font-weight: 600; }
+.hist__date { color: var(--pencil); }
+.hist__who { margin-top: 2px; color: var(--pencil); }
+.hist__reason { margin-top: 6px; max-width: 60ch; }
+.hist__diff { margin-top: 6px; font-size: 13px; line-height: 18px; color: var(--pencil); }
+.hist__btn { margin-top: 12px; }
+.hist__none { padding: 14px 0; color: var(--pencil); }
 </style>

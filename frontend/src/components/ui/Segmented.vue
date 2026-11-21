@@ -11,11 +11,12 @@ const emit = defineEmits(['update:modelValue'])
   </div>
 </template>
 <style>
-.seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-.seg__opt { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 99px; background: transparent; color: var(--u-muted); font-size: 13px; font-weight: 400; white-space: nowrap; transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease); }
-.seg__opt:hover { color: var(--u-ink); background: var(--u-fill); }
-.seg__opt.is-on { background: var(--u-fill-2); color: var(--u-ink); font-weight: 500; }
-.seg__count { color: var(--u-soft); font-variant-numeric: tabular-nums; }
-.seg__opt.is-on .seg__count { color: var(--u-muted); }
-.seg--sm .seg__opt { height: 24px; padding: 0 9px; }
+.seg { display: inline-flex; gap: 20px; flex-wrap: wrap; }
+.seg__opt { position: relative; display: inline-flex; align-items: baseline; gap: 6px; height: 32px; padding: 6px 0 0; border: 0; background: none; color: var(--pencil); font-weight: 500; white-space: nowrap; transition: color 140ms var(--ease); }
+.seg__opt:hover { color: var(--ink); }
+.seg__opt.is-on { color: var(--ink); }
+.seg__opt.is-on::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink); border-radius: 1px; }
+.seg__count { font-weight: 400; color: var(--pencil); font-variant-numeric: tabular-nums; }
+.seg--sm { gap: 16px; }
+.seg--sm .seg__opt { height: 28px; font-size: 13px; }
 </style>

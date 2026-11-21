@@ -3,7 +3,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Upload, Play, Tags, RotateCcw, Trash2 } from '@lucide/vue'
+import { Upload, Trash2 } from '@lucide/vue'
 import Chip from '../components/ui/Chip.vue'
 import JobBanner from '../components/app/JobBanner.vue'
 import UploadDialog from '../components/app/UploadDialog.vue'
@@ -102,28 +102,29 @@ async function run (kind) {
   }
 }
 // метка темы в плитке строки, как в окне продукта на лендинге: S солнечные элементы, R RAG
-const tag = d => { const l = d.classification?.labels || []; return l.includes('solar') && l.includes('rag') ? 'SR' : l.includes('solar') ? 'S' : l.includes('rag') ? 'R' : '–' }
-const tone = d => { const l = d.classification?.labels || []; return l.includes('solar') ? 2 : l.includes('rag') ? 4 : 0 }
+// тема словом: цветные плитки ничего не добавляли к смыслу
+const topicWord = d => { const l = d.classification?.labels || []; return l.includes('solar') && l.includes('rag') ? 'Солнечные и RAG' : l.includes('solar') ? 'Солнечные' : l.includes('rag') ? 'RAG' : '' }
 </script>
 
 <template>
   <div class="page docs">
     <div class="page__head">
       <h1 class="page__title">Документы</h1>
-      <div class="docs__filters" role="tablist" aria-label="Фильтр по статусу">
-        <button v-for="(g, k) in GROUPS" v-show="k === 'all' || counts[k]" :key="k" type="button" role="tab" class="docs__filter" :class="{ 'is-on': filter === k }" :aria-selected="filter === k" @click="filter = k">
-          {{ g.label }}<span class="num">{{ counts[k] }}</span>
+      <div class="tabs docs__filters" role="tablist" aria-label="Фильтр по статусу">
+        <button v-for="(g, k) in GROUPS" v-show="k === 'all' || counts[k]" :key="k" type="button" role="tab" class="tab" :class="{ 'is-on': filter === k }" :aria-selected="filter === k" @click="filter = k">
+          {{ g.label }}<span class="tab__n">{{ counts[k] }}</span>
         </button>
       </div>
       <span class="grow" />
       <template v-if="editable && !ui.mobile">
         <template v-if="selected.size">
+          <span class="docs__picked">Выбрано {{ selected.size }}</span>
           <button class="btn btn--ghost" type="button" @click="selected.clear()">Снять выбор</button>
-          <button class="btn" type="button" @click="run('classify')"><Tags />Определить тему</button>
-          <button class="btn btn--primary" type="button" @click="run('process')"><Play />Обработать выбранные ({{ selected.size }})</button>
+          <button class="btn" type="button" @click="run('classify')">Определить тему</button>
+          <button class="btn btn--primary" type="button" @click="run('process')">Обработать</button>
         </template>
         <template v-else>
-          <button class="btn btn--ghost" type="button" :disabled="!list.length" @click="run('process')"><Play />Обработать все</button>
+          <button class="btn btn--ghost" type="button" :disabled="!list.length" @click="run('process')">Обработать все</button>
           <button class="btn btn--accent" type="button" @click="uploadOpen = true"><Upload />Загрузить PDF</button>
         </template>
       </template>
@@ -131,83 +132,84 @@ const tone = d => { const l = d.classification?.labels || []; return l.includes(
 
     <JobBanner :waiting-docs="waitingDocs" @changed="load" />
 
-    <div v-if="loading" class="panel docs__list"><span v-for="i in 6" :key="i" class="skeleton" style="height: 20px; margin: 12px 16px" /></div>
-    <div v-else-if="!list.length" class="panel empty">
+    <div v-if="loading" class="docs__skel"><span v-for="i in 6" :key="i" class="skeleton" style="height: 18px; margin: 14px 0" /></div>
+    <div v-else-if="!list.length" class="empty">
       <h3>В корпусе пока нет статей</h3>
-      <p>Загрузите PDF: код статьи возьмётся из имени файла, дубликаты отсеются по коду и хешу.</p>
+      <p>Загрузите PDF. Код статьи возьмётся из имени файла, повторы отсеются.</p>
       <button v-if="editable && !ui.mobile" class="btn btn--accent" type="button" @click="uploadOpen = true"><Upload />Загрузить PDF</button>
     </div>
 
-    <div v-else class="panel docs__list" :class="{ 'is-picking': selected.size }">
-      <div v-if="!ui.mobile" class="docs__cols" aria-hidden="true">
-        <span><input v-if="editable" type="checkbox" class="cb docs__all" :checked="allChecked" aria-label="Выбрать все" @change="toggleAll"></span>
-        <span>Статья</span><span>Название</span><span>Статус</span><span class="t-r">Записи</span><span class="t-r">Замеч.</span><span />
-      </div>
-      <ul>
-        <li v-for="d in shown" :key="d.id" class="docs__row" :class="{ 'is-sel': selected.has(d.id) }" @click="open(d)">
-          <span class="docs__pick" @click.stop>
-            <span class="ui-avatar" :data-tone="tone(d)" aria-hidden="true">{{ tag(d) }}</span>
-            <input v-if="editable && !ui.mobile" type="checkbox" class="cb" :checked="selected.has(d.id)" :aria-label="`Выбрать ${d.publication_code}`" @change="toggle(d.id)">
-          </span>
-          <span class="docs__who">{{ d.publication_code }}</span>
-          <span class="docs__sub">
+    <table v-else-if="!ui.mobile" class="table docs__table">
+      <thead>
+        <tr>
+          <th class="t-check"><input v-if="editable" type="checkbox" class="cb" :checked="allChecked" aria-label="Выбрать все" @change="toggleAll"></th>
+          <th>Код</th>
+          <th>Название</th>
+          <th>Тема</th>
+          <th>Статус</th>
+          <th class="t-num">Записи</th>
+          <th class="t-num">Замечания</th>
+          <th v-if="deletable" class="t-act"><span class="visually-hidden">Удаление</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="d in shown" :key="d.id" class="is-link" :class="{ 'is-selected': selected.has(d.id) }" @click="open(d)">
+          <td class="t-check" @click.stop><input v-if="editable" type="checkbox" class="cb" :checked="selected.has(d.id)" :aria-label="`Выбрать ${d.publication_code}`" @change="toggle(d.id)"></td>
+          <td class="docs__code">{{ d.publication_code }}</td>
+          <td class="docs__name">
             <span class="docs__title">{{ d.title || d.original_filename }}</span>
             <span v-if="d.status_hint" class="docs__hint">{{ d.status_hint }}</span>
-          </span>
-          <span class="docs__st">
+          </td>
+          <td class="docs__topic">{{ topicWord(d) }}</td>
+          <td class="docs__st">
             <Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" />
-            <span v-if="d.status === 'processing' && d.processing" class="docs__stage">{{ STAGE[d.processing.stage] }}<template v-if="d.processing.progress?.total && ['text', 'extract'].includes(d.processing.stage)">, {{ d.processing.progress.done }}/{{ d.processing.progress.total }}</template></span>
-            <button v-if="d.status === 'blocked' && editable && !ui.mobile" class="btn btn--sm" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)"><RotateCcw />Повторить задание</button>
-          </span>
-          <span class="docs__n num">{{ d.records ? fmtNum(d.records, 0) : '' }}</span>
-          <span class="docs__n"><span v-if="d.issues_open" class="count count--warn">{{ d.issues_open }}</span></span>
-          <button v-if="deletable" class="btn btn--ghost btn--icon docs__delete" type="button" :aria-label="`Удалить статью ${d.publication_code}`" :disabled="deleting.has(d.id)" @click.stop="remove(d)"><Trash2 /></button>
-        </li>
-      </ul>
-      <p v-if="!shown.length" class="empty">В этом фильтре статей нет.</p>
-    </div>
+            <span v-if="d.status === 'processing' && d.processing" class="docs__stage">{{ STAGE[d.processing.stage] }}<template v-if="d.processing.progress?.total && ['text', 'extract'].includes(d.processing.stage)">, {{ d.processing.progress.done }} из {{ d.processing.progress.total }}</template></span>
+            <button v-if="d.status === 'blocked' && editable" class="btn btn--sm docs__retry" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)">Повторить задание</button>
+          </td>
+          <td class="t-num">{{ d.records ? fmtNum(d.records, 0) : '' }}</td>
+          <td class="t-num"><span v-if="d.issues_open" class="count count--warn">{{ d.issues_open }}</span></td>
+          <td v-if="deletable" class="t-act" @click.stop><button class="btn btn--ghost btn--icon btn--sm row-del" type="button" :aria-label="`Удалить статью ${d.publication_code}`" :title="`Удалить статью ${d.publication_code}`" :disabled="deleting.has(d.id)" @click="remove(d)"><Trash2 /></button></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <ul v-else class="docs__list">
+      <li v-for="d in shown" :key="d.id">
+        <button type="button" class="docs__row" @click="open(d)">
+          <span class="docs__line"><b>{{ d.publication_code }}</b><Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" /></span>
+          <span class="docs__title">{{ d.title || d.original_filename }}</span>
+          <span v-if="d.status_hint" class="docs__hint">{{ d.status_hint }}</span>
+        </button>
+      </li>
+    </ul>
+    <p v-if="!loading && list.length && !shown.length" class="empty">В этом фильтре статей нет.</p>
 
     <UploadDialog :open="uploadOpen" :corpus-id="ws.corpus.id" @close="uploadOpen = false" @uploaded="load" />
   </div>
 </template>
 
 <style>
-.docs__filters { display: flex; gap: 4px; flex-wrap: wrap; margin-left: 8px; }
-.docs__filter { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 99px; background: none; color: var(--u-muted); font-size: 13px; transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease); }
-.docs__filter .num { color: var(--u-soft); }
-.docs__filter:hover { color: var(--u-ink); background: var(--u-fill); }
-.docs__filter.is-on { color: var(--u-ink); background: var(--u-fill-2); font-weight: 500; }
-.docs__filter.is-on .num { color: var(--u-muted); }
-.docs__list { overflow: hidden; }
-.docs__cols, .docs__row { display: grid; grid-template-columns: 28px 56px minmax(0, 1fr) 176px 56px 56px 32px; align-items: center; gap: 0 12px; padding: 0 16px; }
-.docs__cols { height: 34px; color: var(--u-soft); box-shadow: inset 0 -1px 0 var(--u-line); }
-.docs__cols .t-r { text-align: right; }
-.docs__row { min-height: 44px; padding-top: 6px; padding-bottom: 6px; cursor: pointer; transition: background-color 160ms var(--u-ease); }
-.docs__row + .docs__row { box-shadow: inset 0 1px 0 var(--u-line); }
-.docs__row:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
-.docs__row.is-sel { background: var(--u-tint); }
-.docs__pick { position: relative; display: grid; place-items: center; width: 24px; height: 24px; }
-.docs__pick .ui-avatar { font-size: 11px; letter-spacing: 0; }
-.docs__pick .cb { position: absolute; inset: 4px; opacity: 0; }
-.docs__row:hover .docs__pick .cb, .docs__list.is-picking .docs__pick .cb { opacity: 1; }
-.docs__row:hover .docs__pick .ui-avatar, .docs__list.is-picking .docs__pick .ui-avatar { opacity: 0; }
-.docs__all { margin-left: 4px; }
-.docs__who { font-weight: 500; white-space: nowrap; }
-.docs__sub { display: flex; flex-direction: column; min-width: 0; }
-.docs__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docs__hint { color: var(--u-muted); font-size: 12px; line-height: 16px; }
-.docs__st { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
-.docs__stage { font-size: 12px; line-height: 16px; color: var(--u-soft); }
-.docs__n { text-align: right; color: var(--u-text-2); }
+.docs__filters { margin-left: 4px; }
+.docs__picked { color: var(--pencil); }
+.docs__table td { vertical-align: top; padding-top: 12px; }
+.docs__code { width: 64px; font-weight: 600; white-space: nowrap; }
+.docs__name { max-width: 0; width: 100%; }
+.docs__title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs__hint { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--pencil); white-space: normal; }
+.docs__topic { width: 150px; color: var(--pencil); white-space: nowrap; }
+.docs__st { width: 190px; }
+.docs__st .chip { display: flex; }
+.docs__stage { display: block; margin-top: 2px; font-size: 13px; color: var(--pencil); }
+.docs__retry { margin-top: 8px; }
+.docs__table .t-num { width: 96px; }
+.docs__table td.t-act { padding-top: 8px; }
+.docs__list { box-shadow: inset 0 1.5px 0 var(--rule-strong), inset 0 -1.5px 0 var(--rule-strong); }
+.docs__list li + li { box-shadow: inset 0 1px 0 var(--rule); }
+.docs__row { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 14px 0; border: 0; background: none; text-align: left; }
+.docs__line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.docs__line b { font-weight: 600; }
+.docs__row .docs__title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 @media (max-width: 719px) {
-  .page__head .docs__filters { order: 5; flex-basis: 100%; margin: 4px 0 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .docs__filter { flex: none; }
-  .docs__row { grid-template-columns: 24px minmax(0, 1fr) auto 32px; grid-template-rows: auto auto; gap: 2px 10px; padding: 10px 14px; }
-  .docs__pick { grid-row: 1 / 3; }
-  .docs__who { grid-column: 2; grid-row: 1; }
-  .docs__sub { grid-column: 2 / 5; grid-row: 2; }
-  .docs__delete { grid-column: 4; grid-row: 1; }
-  .docs__st { grid-column: 3; grid-row: 1; align-items: flex-end; }
-  .docs__n, .docs__stage { display: none; }
+  .page__head .docs__filters { order: 5; flex-basis: 100%; margin: 0; }
 }
 </style>

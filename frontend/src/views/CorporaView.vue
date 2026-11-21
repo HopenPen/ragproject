@@ -2,7 +2,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Archive, Trash2 } from '@lucide/vue'
+import { Plus, Trash2 } from '@lucide/vue'
 import Modal from '../components/ui/Modal.vue'
 import BrandMark from '../components/app/BrandMark.vue'
 import UserMenu from '../components/app/UserMenu.vue'
@@ -10,8 +10,9 @@ import { corpora } from '../api/index.js'
 import { ws, loadCorpora } from '../stores/workspace.js'
 import { session, canManage } from '../stores/session.js'
 import { askReason } from '../stores/dialogs.js'
+import { ui } from '../stores/ui.js'
 import { notify } from '../stores/toasts.js'
-import { fmtDate, countText } from '../lib/format.js'
+import { fmtDate } from '../lib/format.js'
 
 const router = useRouter()
 const loading = ref(true)
@@ -20,6 +21,7 @@ const form = ref({ name: '', description: '', split: 'dev' })
 const busy = ref(false)
 const fieldError = ref('')
 const canCreate = computed(() => ['editor', 'admin'].includes(session.user?.role))
+const manageable = computed(() => ws.corpora.some(c => canManage(c)))
 const deleting = ref(new Set())
 async function remove (corpus) {
   const accepted = await askReason({ title: `Удалить корпус «${corpus.name}»?`, text: 'Будут удалены все PDF, извлечённые данные, история изменений и выгрузки корпуса. Восстановить их через сайт будет невозможно.', confirm: 'Удалить корпус', tone: 'danger', withReason: false })
@@ -51,10 +53,9 @@ async function create () {
 
 <template>
   <div class="shell">
-    <header class="shell__bar">
-      <span class="shell__brand"><BrandMark /><span>Science Extract</span></span>
-      <span class="grow" />
-      <UserMenu />
+    <header class="bar">
+      <span class="bar__brand"><BrandMark /><span>Science Extract</span></span>
+      <div class="bar__end"><UserMenu /></div>
     </header>
     <main class="page corpora">
       <div class="page__head">
@@ -62,27 +63,37 @@ async function create () {
         <span class="grow" />
         <button v-if="canCreate" class="btn btn--accent" type="button" @click="createOpen = true; fieldError = ''"><Plus />Новый корпус</button>
       </div>
-      <div v-if="loading" class="panel"><div v-for="i in 3" :key="i" class="skeleton" style="height: 20px; margin: 18px 16px" /></div>
-      <div v-else-if="!ws.corpora.length" class="panel empty">
+      <div v-if="loading" class="corpora__ghost"><span v-for="i in 3" :key="i" class="skeleton" style="height: 18px" /></div>
+      <div v-else-if="!ws.corpora.length" class="empty">
         <h3>Корпусов пока нет</h3>
         <p>Корпус объединяет статьи одной задачи: например, dev-набор для настройки или тестовый набор для сдачи.</p>
         <button v-if="canCreate" class="btn btn--accent" type="button" @click="createOpen = true">Создать корпус</button>
       </div>
-      <div v-else class="panel corpora__list">
-        <div class="corpora__cols" aria-hidden="true"><span>Корпус</span><span class="t-r">Статьи</span><span class="t-r">Записи</span><span class="t-r">Замечания</span><span>Набор</span><span class="t-r">Изменён</span><span /></div>
-        <div v-for="c in ws.corpora" :key="c.id" class="corpora__row">
-          <RouterLink :to="`/corpora/${c.id}/documents`" class="corpora__main">
-            <span class="corpora__name">{{ c.name }}<span v-if="c.status === 'archived'" class="chip chip--off corpora__arch"><Archive style="width: 12px; height: 12px" />в архиве</span></span>
-            <span v-if="c.description" class="corpora__desc">{{ c.description }}</span>
+      <table v-else-if="!ui.mobile" class="table corpora__table">
+        <thead><tr><th>Корпус</th><th>Набор</th><th class="t-num">Статьи</th><th class="t-num">Записи</th><th class="t-num">Замечания</th><th class="t-num">Изменён</th><th v-if="manageable" class="t-act"><span class="visually-hidden">Удаление</span></th></tr></thead>
+        <tbody>
+          <tr v-for="c in ws.corpora" :key="c.id" class="is-link" @click="router.push(`/corpora/${c.id}/documents`)">
+            <td class="corpora__main">
+              <RouterLink :to="`/corpora/${c.id}/documents`" class="corpora__name" @click.stop>{{ c.name }}</RouterLink><span v-if="c.status === 'archived'" class="corpora__arch">, в архиве</span>
+              <span v-if="c.description" class="corpora__desc">{{ c.description }}</span>
+            </td>
+            <td class="muted">{{ c.split }}</td>
+            <td class="t-num">{{ c.stats?.documents ?? 0 }}</td>
+            <td class="t-num">{{ c.stats?.records ?? 0 }}</td>
+            <td class="t-num"><span v-if="c.stats?.issues_open" class="count count--warn">{{ c.stats.issues_open }}</span></td>
+            <td class="t-num muted">{{ fmtDate(c.updated_at) }}</td>
+            <td v-if="manageable" class="t-act" @click.stop><button v-if="canManage(c)" class="btn btn--ghost btn--icon btn--sm row-del" type="button" :aria-label="`Удалить корпус ${c.name}`" :title="`Удалить корпус ${c.name}`" :disabled="deleting.has(c.id)" @click="remove(c)"><Trash2 /></button></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul v-else class="mcorp">
+        <li v-for="c in ws.corpora" :key="c.id">
+          <RouterLink :to="`/corpora/${c.id}/documents`" class="mcorp__row">
+            <span class="mcorp__name">{{ c.name }}</span>
+            <span class="mcorp__meta">{{ c.split }}, статей {{ c.stats?.documents ?? 0 }}<template v-if="c.stats?.issues_open">, <span class="count count--warn">замечаний {{ c.stats.issues_open }}</span></template></span>
           </RouterLink>
-          <span class="corpora__n num" data-label="Статьи">{{ c.stats?.documents ?? 0 }}</span>
-          <span class="corpora__n num" data-label="Записи">{{ c.stats?.records ?? 0 }}</span>
-          <span class="corpora__n" data-label="Замечания"><span v-if="c.stats?.issues_open" class="count count--warn">{{ c.stats.issues_open }}</span><span v-else class="num">0</span></span>
-          <span class="corpora__split"><span class="chip chip--plain">{{ c.split }}</span></span>
-          <span class="corpora__age">{{ fmtDate(c.updated_at) }}</span>
-          <button v-if="canManage(c)" class="btn btn--ghost btn--icon" type="button" :aria-label="`Удалить корпус ${c.name}`" :disabled="deleting.has(c.id)" @click="remove(c)"><Trash2 /></button>
-        </div>
-      </div>
+        </li>
+      </ul>
     </main>
 
     <Modal :open="createOpen" title="Новый корпус" @close="createOpen = false">
@@ -93,7 +104,7 @@ async function create () {
           <span v-if="fieldError" class="field__error">{{ fieldError }}</span>
         </label>
         <label class="field">
-          <span class="field__label">Описание<span class="faint">, необязательно</span></span>
+          <span class="field__label">Описание<span class="muted">, необязательно</span></span>
           <textarea v-model="form.description" class="textarea" rows="2" />
         </label>
         <label class="field">
@@ -106,7 +117,7 @@ async function create () {
         </label>
       </form>
       <template #footer>
-        <button class="btn" type="button" @click="createOpen = false">Отмена</button>
+        <button class="btn btn--ghost" type="button" @click="createOpen = false">Отмена</button>
         <button class="btn btn--accent" type="submit" form="corpus-form" :disabled="busy">Создать корпус</button>
       </template>
     </Modal>
@@ -114,29 +125,17 @@ async function create () {
 </template>
 
 <style>
-.corpora { max-width: 1080px; }
-.corpora__list { overflow: hidden; }
-.corpora__cols, .corpora__row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px 88px 72px 120px 32px; align-items: center; gap: 0 16px; padding: 0 16px; }
-.corpora__cols { height: 34px; color: var(--u-soft); background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
-.corpora__cols .t-r { text-align: right; }
-.corpora__row { min-height: 60px; padding-top: 10px; padding-bottom: 10px; color: var(--u-ink); text-decoration: none !important; transition: background-color 160ms var(--u-ease); }
-.corpora__row + .corpora__row { box-shadow: inset 0 1px 0 var(--u-line); }
-.corpora__row:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
-.corpora__main { display: flex; flex-direction: column; min-width: 0; color: inherit; }
-.corpora__name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-.corpora__arch { height: 20px; font-size: 12px; }
-.corpora__desc { color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.corpora__n { text-align: right; color: var(--u-text-2); }
-.corpora__age { text-align: right; color: var(--u-soft); white-space: nowrap; }
-@media (max-width: 719px) {
-  .corpora__cols { display: none; }
-  .corpora__row { grid-template-columns: repeat(3, auto) 1fr; grid-template-rows: auto auto; gap: 8px 16px; padding: 12px 14px; }
-  .corpora__main { grid-column: 1 / 4; }
-  .corpora__row > button { grid-column: 4; grid-row: 1; justify-self: end; }
-  .corpora__desc { white-space: normal; }
-  .corpora__n { text-align: left; display: flex; flex-direction: column; font-size: 13px; }
-  .corpora__n::before { content: attr(data-label); font-size: 12px; line-height: 16px; color: var(--u-soft); }
-  .corpora__split { justify-self: end; align-self: end; }
-  .corpora__age { display: none; }
-}
+.corpora { max-width: 1120px; }
+.corpora__ghost { display: flex; flex-direction: column; gap: 26px; padding: 20px 0; }
+.corpora__table td { height: 64px; }
+.corpora__main { min-width: 0; max-width: 560px; }
+.corpora__name { font-weight: 600; color: var(--ink); text-decoration: none; }
+.corpora__name:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.corpora__arch { color: var(--pencil); }
+.corpora__desc { display: block; color: var(--pencil); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcorp { box-shadow: inset 0 1.5px 0 var(--rule-strong); }
+.mcorp li + li { box-shadow: inset 0 1px 0 var(--rule); }
+.mcorp__row { display: flex; flex-direction: column; gap: 2px; padding: 14px 0; color: var(--ink); text-decoration: none; }
+.mcorp__name { font-weight: 600; }
+.mcorp__meta { color: var(--pencil); }
 </style>

@@ -1,53 +1,64 @@
-/* Назначение файла: палитры тем для UI-кита taste-skill (тот же кит, из которого собраны макеты продукта на лендинге).
-   Кит выводит все цвета интерфейса из пяти базовых (--fx-bg, --fx-ink, --fx-muted, --fx-accent, --fx-accent-ink)
-   и сам понимает, светлая тема или тёмная: тени, линии и заливки считаются от фона. Поэтому темы отличаются
-   только этими базовыми цветами. Тёмная: палитра лендинга на ступень светлее. Светлая: инверсная палитра лендинга.
-   Отдельно задаются только тексты статусов (тот же тон, светлота под контраст 4,5:1) и цвет бумаги PDF. */
-
+/* Назначение файла: цвета, шрифты и шкала Science Extract. Палитры взяты с лендинга и закреплены брифом:
+   светлая тема точно инвертирует лендинг, тёмная на ступень светлее. Имена по смыслу рабочего места:
+   стол (фон), полка (то, что приподнято над столом), чернила, карандаш (вторичный текст), источник
+   (зелёный: главное действие экрана и рамка вокруг числа на странице), бумага (только страницы статей). */
 :root {
   --font: "Geologica", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Liberation Serif", "Times New Roman", Times, serif;
   --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --ui-font: var(--font);
-  --ui-mono: var(--mono);
-  --ui-radius: 12px;
   --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.22, 1, .36, 1);
+
+  /* шкала с шагом около 1,25: подписи, текст, подзаголовок, раздел, заголовок страницы, ключевое число */
+  --t-12: 12px; --t-14: 14px; --t-17: 17px; --t-21: 21px; --t-26: 26px; --t-32: 32px;
 
   --ochre: #B7791F;
   --red: #C4432F;
-  --blue: #3B78AE;
+  --source: #07854A;
 }
 
-:root,
-[data-theme="light"] {
+:root, [data-theme="light"] {
   color-scheme: light;
-  --fx-bg: #F1F1EF;
-  --fx-surface: #E0E0DE;
-  --fx-ink: #1C1C1C;
-  --fx-muted: #505050;
-  --fx-accent: #07854A;
-  --fx-accent-ink: #FFFFFF;
+  --desk: #F1F1EF;
+  --shelf: #E0E0DE;
+  --ink: #1C1C1C;
+  --pencil: #5E5E5E;
+  --paper: #F5F2EA;
+  --float: #F8F8F6;                 /* всплывающие окна: на ступень светлее стола */
+  --accent-text: #006435;
+  --warn: #7B4C00;
+  --danger: #A11E0A;
+  --shade: rgb(28 28 28 / .16);
+  --scrim: rgb(28 28 28 / .34);
 
-  --accent-text-tone: #006435;
-  --warn-tone: #7B4C00;
-  --danger-tone: #A11E0A;
-  --info-tone: #1C5B8F;
-  --paper-tone: #F5F2EA;
-  --scrim-a: 34%;
+  /* для фрагмента кита на странице входа */
+  --fx-bg: #F1F1EF; --fx-surface: #E0E0DE; --fx-ink: #1C1C1C; --fx-muted: #5E5E5E; --fx-accent: #07854A; --fx-accent-ink: #FFFFFF;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --fx-bg: #222222;
-  --fx-surface: #2C2C2C;
-  --fx-ink: #F1F1EF;
-  --fx-muted: #ADADA8;
-  --fx-accent: #07854A;
-  --fx-accent-ink: #FFFFFF;
+  --desk: #222222;
+  --shelf: #2C2C2C;
+  --ink: #F1F1EF;
+  --pencil: #A3A39E;
+  --paper: #E5E0D6;
+  --float: #2C2C2C;
+  --accent-text: #4FB678;
+  --warn: #DC9C49;
+  --danger: #FF806A;
+  --shade: rgb(0 0 0 / .5);
+  --scrim: rgb(0 0 0 / .56);
 
-  --accent-text-tone: #4FB678;
-  --warn-tone: #DC9C49;
-  --danger-tone: #FF806A;
-  --info-tone: #73B1EA;
-  --paper-tone: #E5E0D6;
-  --scrim-a: 56%;
+  --fx-bg: #222222; --fx-surface: #2C2C2C; --fx-ink: #F1F1EF; --fx-muted: #A3A39E; --fx-accent: #07854A; --fx-accent-ink: #FFFFFF;
+}
+
+:root {
+  /* производные: линии таблиц как в статьях (верхняя и нижняя жирнее, под шапкой тоньше), наведение, выбор */
+  --rule: color-mix(in oklab, var(--ink) 12%, transparent);
+  --rule-mid: color-mix(in oklab, var(--ink) 30%, transparent);
+  --rule-strong: color-mix(in oklab, var(--ink) 62%, transparent);
+  --hover: color-mix(in oklab, var(--ink) 4.5%, var(--desk));
+  --picked: color-mix(in oklab, var(--source) 12%, var(--desk));
+  --faint: var(--pencil);          /* третьего серого нет: всё вторичное пишется карандашом */
+  --shadow: 0 1px 2px var(--shade), 0 18px 48px -12px var(--shade);
 }

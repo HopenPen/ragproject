@@ -1,7 +1,6 @@
 <!-- Назначение файла: подробности задания: этап каждой статьи, ошибки, отмена между этапами и повтор упавших. -->
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RotateCcw, CircleStop, Pause, Play } from '@lucide/vue'
 import Drawer from '../ui/Drawer.vue'
 import Chip from '../ui/Chip.vue'
 import Progress from '../ui/Progress.vue'
@@ -64,8 +63,8 @@ function itemProgress (i) {
       </p>
     </template>
     <div v-if="job" class="stack jd">
-      <p v-if="job.status === 'pause_requested'" class="muted">Текущий этап или запрос к модели завершится и сохранится. Следующие файлы не начнутся.</p>
-      <p v-if="job.status === 'paused'" class="muted">Прогресс сохранён. Нажмите «Продолжить», чтобы возобновить обработку.</p>
+      <p v-if="job.status === 'pause_requested'" class="jd__note">Текущий этап или запрос к модели завершится и сохранится. Следующие файлы не начнутся.</p>
+      <p v-if="job.status === 'paused'" class="jd__note">Прогресс сохранён. Нажмите «Продолжить», чтобы возобновить обработку.</p>
       <p v-if="job.error" class="jd__error">{{ job.error.message }}</p>
       <table v-if="items.length" class="table jd__table">
         <thead><tr><th>Код</th><th>Этап</th><th>Статус</th></tr></thead>
@@ -85,21 +84,20 @@ function itemProgress (i) {
     </div>
     <div v-else class="skeleton" style="height: 240px" />
     <template v-if="job && editable && (active || retryable)" #footer>
-      <button v-if="pausable" class="btn" type="button" :disabled="busy" @click="changePause"><Pause />Приостановить</button>
-      <button v-if="job.status === 'paused'" class="btn btn--primary" type="button" :disabled="busy" @click="changePause"><Play />Продолжить</button>
-      <button v-if="active" class="btn" type="button" :disabled="busy || job.status === 'cancel_requested'" @click="cancel"><CircleStop />Отменить</button>
-      <button v-if="!active && retryable" class="btn btn--primary" type="button" :disabled="busy" @click="retry"><RotateCcw />Повторить упавшие</button>
+      <button v-if="pausable" class="btn" type="button" :disabled="busy" @click="changePause">Приостановить</button>
+      <button v-if="job.status === 'paused'" class="btn btn--primary" type="button" :disabled="busy" @click="changePause">Продолжить</button>
+      <button v-if="active" class="btn" type="button" :disabled="busy || job.status === 'cancel_requested'" @click="cancel">Отменить</button>
+      <button v-if="!active && retryable" class="btn btn--primary" type="button" :disabled="busy" @click="retry">Повторить упавшие</button>
     </template>
   </Drawer>
 </template>
 
 <style>
-.jd__sub { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
-.jd__error { display: flex; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); color: var(--u-ink); }
-.jd__error::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
-.jd__table th { font-size: 12px; }
+.jd__sub { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; color: var(--pencil); }
+.jd__error { max-width: 64ch; color: var(--danger); }
+.jd__note { max-width: 64ch; color: var(--pencil); }
 .jd__table td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
-.jd__table b { font-weight: 500; }
-.jd__bar { margin-top: 6px; max-width: 220px; }
-.jd__item-error { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-text-2); }
+.jd__table b { font-weight: 600; }
+.jd__bar { margin-top: 8px; max-width: 220px; }
+.jd__item-error { margin-top: 4px; font-size: 13px; line-height: 18px; color: var(--pencil); }
 </style>

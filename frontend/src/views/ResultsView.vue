@@ -3,7 +3,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, GitCompare, X } from '@lucide/vue'
+import { Search } from '@lucide/vue'
 import Segmented from '../components/ui/Segmented.vue'
 import Metric from '../components/ui/Metric.vue'
 import CompareDrawer from '../components/app/CompareDrawer.vue'
@@ -79,8 +79,9 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
   <div class="page res">
     <div class="page__head">
       <h1 class="page__title">Результаты</h1>
-      <span class="grow" />
       <Segmented v-model="profile" :options="[{ value: 'solar-v1', label: 'Солнечные элементы' }, { value: 'rag-v1', label: 'RAG-системы' }]" label="Профиль" />
+      <span class="grow" />
+      <span v-if="!loading" class="res__total">{{ countText(total, ['значение', 'значения', 'значений']) }}</span>
     </div>
 
     <div class="res__filters">
@@ -98,43 +99,50 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
         <option value="mean">среднее</option>
       </select>
       <label class="check res__check"><input v-model="issuesOnly" type="checkbox" class="cb">С замечаниями</label>
-      <button v-if="filtered" class="btn btn--ghost btn--sm" type="button" @click="reset"><X />Сбросить</button>
+      <button v-if="filtered" class="btn btn--ghost btn--sm" type="button" @click="reset">Сбросить</button>
     </div>
 
-    <div class="panel res__table">
-      <table class="table">
-        <thead>
-          <tr>
-            <th class="t-check"><input type="checkbox" class="cb" :checked="allOn" aria-label="Выбрать все" @change="toggleAll"></th>
-            <th><button class="th-sort" type="button" @click="sortBy('publication_code')">Статья {{ arrow('publication_code') }}</button></th>
-            <th><button class="th-sort" type="button" @click="sortBy('metric_name')">{{ isSolar ? 'Показатель' : 'Метрика' }} {{ arrow('metric_name') }}</button></th>
-            <th class="t-num"><button class="th-sort" type="button" @click="sortBy('metric_value')">Значение {{ arrow('metric_value') }}</button></th>
-            <th>Условия</th>
-            <th>Источник</th>
-            <th class="t-num"><span class="visually-hidden">Замечания</span></th>
-          </tr>
-        </thead>
-        <tbody v-if="!loading || rows.length">
-          <tr v-for="r in rows" :key="key(r)" class="is-link" :class="{ 'is-selected': selected.has(key(r)) }" @click="open(r)">
-            <td class="t-check" @click.stop><input type="checkbox" class="cb" :checked="selected.has(key(r))" :aria-label="`Выбрать ${r.publication_code} ${r.result_id}`" @change="toggle(r)"></td>
-            <td class="nowrap"><b>{{ r.publication_code }}</b> <span class="faint">{{ r.result_id }}</span><span v-if="r.origin === 'cited'" class="chip chip--plain res__cited">цитата</span></td>
-            <td class="nowrap"><Metric :name="r.metric_name" :k="r.metric_k" /><span v-if="r.aggregation && r.aggregation !== 'champion'" class="muted">, {{ valueLabel('aggregation', r.aggregation) }}</span></td>
-            <td class="t-num"><b class="res__val">{{ fmtResult(r) }}</b></td>
-            <td class="res__ctx" :title="ctxText(r)"><span class="res__dev">{{ isSolar ? r.context.device : (r.context.config || '–') }}</span><span class="res__cond">{{ isSolar ? conditions(r) : [r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</span></td>
-            <td class="nowrap res__src"><template v-if="r.source.has_evidence">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></template><span v-else class="res__nosrc">без источника</span></td>
-            <td class="t-num"><span v-if="r.issues_open" class="count count--warn">{{ r.issues_open }}</span></td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-if="!loading && !rows.length" class="empty">{{ filtered ? 'Под фильтры ничего не подходит.' : `В профиле «${profileTitle(profile)}» пока нет результатов.` }}</p>
+    <table class="table res__table">
+      <thead>
+        <tr>
+          <th class="t-check"><input type="checkbox" class="cb" :checked="allOn" aria-label="Выбрать все" @change="toggleAll"></th>
+          <th class="res__c-pub"><button class="th-sort" :class="{ 'is-on': sort.key === 'publication_code' }" type="button" @click="sortBy('publication_code')">Статья<span class="th-sort__dir">{{ arrow('publication_code') }}</span></button></th>
+          <th><button class="th-sort" :class="{ 'is-on': sort.key === 'metric_name' }" type="button" @click="sortBy('metric_name')">{{ isSolar ? 'Показатель' : 'Метрика' }}<span class="th-sort__dir">{{ arrow('metric_name') }}</span></button></th>
+          <th class="t-num"><button class="th-sort" :class="{ 'is-on': sort.key === 'metric_value' }" type="button" @click="sortBy('metric_value')">Значение<span class="th-sort__dir">{{ arrow('metric_value') }}</span></button></th>
+          <th class="res__c-ctx">{{ isSolar ? 'Прибор и условия' : 'Конфигурация и данные' }}</th>
+          <th class="res__c-src">Источник</th>
+        </tr>
+      </thead>
+      <tbody v-if="loading && !rows.length">
+        <tr v-for="i in 8" :key="i"><td /><td><span class="skeleton" style="width: 64px; height: 14px" /></td><td><span class="skeleton" style="width: 48px; height: 14px" /></td><td class="t-num"><span class="skeleton" style="width: 56px; height: 14px; margin-left: auto" /></td><td><span class="skeleton" style="width: 60%; height: 14px" /></td><td><span class="skeleton" style="width: 64px; height: 14px" /></td></tr>
+      </tbody>
+      <tbody v-else>
+        <tr v-for="r in rows" :key="key(r)" class="is-link" :class="{ 'is-selected': selected.has(key(r)) }" @click="open(r)">
+          <td class="t-check" @click.stop><input type="checkbox" class="cb" :checked="selected.has(key(r))" :aria-label="`Выбрать ${r.publication_code} ${r.result_id}`" @change="toggle(r)"></td>
+          <td class="nowrap"><b>{{ r.publication_code }}</b><span class="res__id">{{ r.result_id }}</span><span v-if="r.origin === 'cited'" class="res__cited">цитата</span></td>
+          <td class="nowrap"><Metric :name="r.metric_name" :k="r.metric_k" /><span v-if="r.aggregation && r.aggregation !== 'champion'" class="muted">, {{ valueLabel('aggregation', r.aggregation) }}</span></td>
+          <td class="t-num">
+            <span class="res__val" :class="{ flag: r.issues_open }" :title="r.issues_open ? `Открытых замечаний: ${r.issues_open}` : null">{{ fmtResult(r) }}</span>
+            <span v-if="r.issues_open" class="visually-hidden">, есть замечания</span>
+          </td>
+          <td class="res__ctx" :title="ctxText(r)"><span class="res__dev">{{ isSolar ? r.context.device : (r.context.config || '–') }}</span><span class="res__cond">{{ isSolar ? conditions(r) : [r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</span></td>
+          <td class="nowrap res__src"><template v-if="r.source.has_evidence">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></template><span v-else class="res__nosrc">без источника</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div v-if="!loading && !rows.length" class="empty">
+      <h3>{{ filtered ? 'Под фильтры ничего не подходит' : 'Результатов пока нет' }}</h3>
+      <p v-if="filtered">Измените условия или сбросьте фильтры.</p>
+      <p v-else>В профиле «{{ profileTitle(profile) }}» появятся значения после обработки статей.</p>
+      <button v-if="filtered" class="btn" type="button" @click="reset">Сбросить фильтры</button>
     </div>
 
     <Transition name="selbar">
       <div v-if="selected.size" class="selbar" role="region" aria-label="Выбранные результаты">
-        <span>Выбрано {{ countText(selected.size, ['результат', 'результата', 'результатов']) }}</span>
+        <span class="selbar__n">Выбрано {{ countText(selected.size, ['значение', 'значения', 'значений']) }}</span>
         <span class="grow" />
-        <button class="btn btn--ghost btn--sm selbar__clear" type="button" @click="selected.clear()">Снять выбор</button>
-        <button class="btn btn--accent btn--sm" type="button" :disabled="selected.size < 2" @click="compareOpen = true"><GitCompare />Сравнить</button>
+        <button class="btn btn--ghost btn--sm" type="button" @click="selected.clear()">Снять выбор</button>
+        <button class="btn btn--accent btn--sm" type="button" :disabled="selected.size < 2" :title="selected.size < 2 ? 'Выберите минимум два значения' : null" @click="compareOpen = true">Сравнить</button>
       </div>
     </Transition>
     <CompareDrawer :open="compareOpen" :corpus-id="ws.corpus.id" :profile="profile" :refs="refs" @close="compareOpen = false" />
@@ -142,25 +150,30 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
 </template>
 
 <style>
-/* таблица результатов как окно результатов на лендинге: тихая шапка, строки 44 px, источник плашкой */
-.res__filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+/* результаты: таблица как в статье, значение с замечанием подчёркнуто волной корректора */
+.res__total { color: var(--pencil); }
+.res__filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
 .res__search { position: relative; display: flex; align-items: center; }
-.res__search svg { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--u-muted); pointer-events: none; }
-.res__search .input { width: 260px; padding-left: 30px; }
-.res__sel { width: auto; min-width: 150px; }
-.res__check { margin-left: 4px; color: var(--u-text-2); }
-.res__table { overflow: auto; margin-bottom: 80px; }
-.res__table .table th { height: 34px; font-size: 12px; background: var(--u-fill); }
-.res__val { font-weight: 500; }
-.res__ctx { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.res__dev { color: var(--u-ink); }
-.res__cond { margin-left: 8px; color: var(--u-soft); }
-.res__cited { margin-left: 6px; height: 20px; font-size: 12px; }
-.res__src { color: var(--u-muted); font-size: 12px; }
+.res__search svg { position: absolute; left: 10px; width: 15px; height: 15px; color: var(--pencil); pointer-events: none; }
+.res__search .input { width: 280px; padding-left: 32px; }
+.res__sel { width: auto; min-width: 156px; }
+.res__check { margin-left: 8px; color: var(--pencil); }
+.res__table { margin-bottom: 96px; }
+.res__c-pub { width: 150px; }
+.res__c-src { width: 150px; }
+.res__id { margin-left: 8px; color: var(--pencil); }
+.res__cited { margin-left: 8px; font-size: 13px; color: var(--pencil); }
+.res__val { font-weight: 600; }
+.res__ctx { max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res__cond { margin-left: 8px; color: var(--pencil); }
+.res__src { color: var(--pencil); font-size: 13px; }
 .res__nosrc { color: var(--danger); }
-.th-sort { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
-.th-sort:hover { color: var(--u-ink); }
-.selbar { position: fixed; left: 50%; bottom: 20px; z-index: 35; display: flex; align-items: center; gap: 10px; width: min(520px, calc(100vw - 32px)); padding: 8px 8px 8px 16px; transform: translateX(-50%); background: var(--u-bg); color: var(--u-ink); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); font-weight: 500; }
-.selbar-enter-active, .selbar-leave-active { transition: opacity 180ms var(--u-ease), transform 240ms var(--u-spring); }
-.selbar-enter-from, .selbar-leave-to { opacity: 0; transform: translate(-50%, 8px); }
+.th-sort { display: inline-flex; align-items: baseline; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+.th-sort:hover, .th-sort.is-on { color: var(--ink); }
+.th-sort__dir { min-width: .6em; }
+.t-num .th-sort { flex-direction: row-reverse; }
+.selbar { position: fixed; left: 50%; bottom: 24px; z-index: 35; display: flex; align-items: center; gap: 8px; width: min(560px, calc(100vw - 32px)); padding: 8px 8px 8px 18px; transform: translateX(-50%); background: var(--float); color: var(--ink); border-radius: 10px; box-shadow: var(--shadow); }
+.selbar__n { font-weight: 600; }
+.selbar-enter-active, .selbar-leave-active { transition: opacity 180ms var(--ease), transform 260ms var(--spring); }
+.selbar-enter-from, .selbar-leave-to { opacity: 0; transform: translate(-50%, 10px); }
 </style>

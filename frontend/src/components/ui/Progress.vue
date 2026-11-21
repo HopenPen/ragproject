@@ -8,9 +8,9 @@ defineProps({ value: { type: Number, default: null }, tone: { type: String, defa
   </div>
 </template>
 <style>
-.progress { position: relative; height: 4px; border-radius: 2px; background: var(--u-line); overflow: hidden; }
-.progress span { display: block; height: 100%; border-radius: 2px; background: var(--u-accent); transition: width 500ms var(--u-ease); }
+.progress { position: relative; height: 2px; background: var(--rule); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--source); transition: width 500ms var(--ease); }
 .progress--warn span { background: var(--ochre); }
-.progress--busy span { animation: busy 1.4s var(--u-ease) infinite; }
+.progress--busy span { animation: busy 1.4s var(--ease) infinite; }
 @keyframes busy { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 </style>

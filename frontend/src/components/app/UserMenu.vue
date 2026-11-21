@@ -20,7 +20,7 @@ async function out (everywhere) {
 <template>
   <Menu width="260px">
     <template #trigger="{ toggle, open }">
-      <button class="ui-avatar ui-avatar--md avatar-btn" data-tone="3" type="button" :aria-expanded="open" aria-label="Меню пользователя" @click="toggle">{{ initials }}</button>
+      <button class="avatar-btn" type="button" :aria-expanded="open" aria-label="Меню пользователя" @click="toggle">{{ initials }}</button>
     </template>
     <div class="menu__label">
       <strong class="user-name">{{ session.user?.display_name }}</strong>
@@ -38,7 +38,7 @@ async function out (everywhere) {
 </template>
 
 <style>
-.avatar-btn { width: 30px; height: 30px; font-size: 12px; }
-.avatar-btn:hover { filter: brightness(1.06); }
-.user-name { display: block; color: var(--u-ink); font-weight: 500; margin-bottom: 2px; }
+.avatar-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--shelf); color: var(--ink); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.avatar-btn:hover { box-shadow: inset 0 0 0 1px var(--rule-mid); }
+.user-name { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
 </style>

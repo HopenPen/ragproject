@@ -57,18 +57,18 @@ async function submit () {
   <Modal :open="open" :title="`Тема статьи ${code || ''}`" width="560px" @close="emit('close')">
     <div v-if="cur" class="stack cls">
       <div class="cls__model">
-        <p class="muted">Оценка модели</p>
-        <ul class="cls__scores">
-          <li v-for="t in TOPICS" :key="t.label"><span>{{ t.title }}</span><b class="num">{{ fmtNum(cur.scores?.[t.label], 2) }}</b></li>
-        </ul>
+        <p class="cls__h">Оценка модели</p>
+        <dl class="cls__scores">
+          <div v-for="t in TOPICS" :key="t.label"><dt>{{ t.title }}</dt><dd class="num">{{ fmtNum(cur.scores?.[t.label], 2) }}</dd></div>
+        </dl>
         <p v-if="cur.note" class="cls__note">{{ cur.note }}</p>
         <blockquote v-if="cur.evidence?.[0]" class="quote">{{ cur.evidence[0].fragment }}</blockquote>
-        <p v-if="cur.evidence?.[0]" class="faint cls__where">стр. {{ cur.evidence[0].page }}</p>
+        <p v-if="cur.evidence?.[0]" class="cls__where">Стр. {{ cur.evidence[0].page }}</p>
       </div>
       <fieldset class="cls__topics">
-        <legend class="field__label">Ваше решение</legend>
+        <legend class="cls__h">Ваше решение</legend>
         <div v-for="t in TOPICS" :key="t.label" class="cls__topic">
-          <label class="check"><input v-model="labels" type="checkbox" class="cb" :value="t.label"><span>{{ t.title }}<span class="faint">, {{ t.hint }}</span></span></label>
+          <label class="check"><input v-model="labels" type="checkbox" class="cb" :value="t.label"><span>{{ t.title }}<span class="muted">, {{ t.hint }}</span></span></label>
           <div v-if="labels.includes(t.label)" class="cls__scope">
             <label class="check"><input v-model="scope[t.profile]" type="radio" :value="true">в рамках профиля</label>
             <label class="check"><input v-model="scope[t.profile]" type="radio" :value="false">вне рамок (например, тандем)</label>
@@ -77,7 +77,7 @@ async function submit () {
         <p v-if="!labels.length" class="field__hint">Без отмеченных тем статья попадёт в выгрузку только библиографией.</p>
       </fieldset>
       <label class="field">
-        <span class="field__label">Причина<span class="faint">, необязательно</span></span>
+        <span class="field__label">Причина<span class="muted">, необязательно</span></span>
         <textarea v-model="reason" class="textarea" rows="2" placeholder="Например: в разделе 2 есть устройство и J-V, тема подтверждена" />
       </label>
       <p v-if="error" class="field__error" role="alert">{{ error }}</p>
@@ -85,24 +85,21 @@ async function submit () {
     <div v-else-if="error" class="field__error">{{ error }}</div>
     <div v-else class="skeleton" style="height: 220px" />
     <template #footer>
-      <button class="btn" type="button" @click="emit('close')">Отмена</button>
+      <button class="btn btn--ghost" type="button" @click="emit('close')">Отмена</button>
       <button class="btn btn--primary" type="button" :disabled="busy || !cur" @click="submit">Сохранить решение</button>
     </template>
   </Modal>
 </template>
 
 <style>
-.cls { gap: 18px; }
-.cls__model > .muted { color: var(--u-soft); }
-.cls__scores { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 10px; }
-.cls__scores li { display: grid; gap: 2px; padding: 8px 12px; border-radius: 8px; background: var(--u-fill); border: 1px solid var(--u-line); }
-.cls__scores span { font-size: 12px; line-height: 16px; color: var(--u-muted); }
-.cls__scores b { font-size: 15px; line-height: 20px; font-weight: 500; }
-.cls__note { display: flex; gap: 8px; margin-bottom: 10px; color: var(--u-ink); }
-.cls__note::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--ochre); flex: none; }
-.cls__where { margin-top: 4px; font-size: 12px; line-height: 16px; }
-.cls__topics { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.cls__topics legend { margin-bottom: 8px; }
-.cls__scope { display: flex; gap: 16px; margin: 6px 0 0 24px; flex-wrap: wrap; }
-.cls__scope .check input { accent-color: var(--u-ink); }
+.cls { gap: 22px; }
+.cls__h { margin-bottom: 8px; color: var(--pencil); }
+.cls__scores { display: flex; gap: 40px; margin-bottom: 12px; }
+.cls__scores div { display: flex; flex-direction: column-reverse; }
+.cls__scores dt { font-size: 13px; line-height: 18px; color: var(--pencil); }
+.cls__scores dd { font-size: var(--t-26); line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.cls__note { margin-bottom: 12px; max-width: 60ch; }
+.cls__where { margin-top: 6px; font-size: 13px; line-height: 18px; color: var(--pencil); }
+.cls__topics { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.cls__scope { display: flex; gap: 20px; margin: 8px 0 0 24px; flex-wrap: wrap; }
 </style>

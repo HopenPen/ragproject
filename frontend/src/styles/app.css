@@ -1,72 +1,44 @@
-/* Назначение файла: интерфейс Science Extract на UI-ките taste-skill. Кит (styles/kit) задаёт язык продукта:
-   шкала 13/20 px, линии 1 px из цвета текста, панели с радиусом 12, тихие статусы с точкой, кнопка-чернила
-   и один зелёный акцент на экран. Здесь: живые состояния, которых нет у картинок кита (наведение, фокус,
-   нажатие, disabled), каркас приложения и общие примитивы на тех же токенах --u-*. */
+/* Назначение файла: общие правила интерфейса Science Extract.
+   Рабочее место эксперта: стол, на нём бумага статьи, рядом заметки на полях. Отсюда правила:
+   содержимое лежит прямо на столе без карточек; таблицы набраны как в статьях (три линейки, без сетки);
+   статус пишется словом, цветом выделено только то, что ждёт решения; зелёный значит «источник»:
+   главное действие экрана и рамка вокруг числа на странице. Тень и скругление есть только у того,
+   что всплывает над столом. */
 
-/* ---------- токены приложения поверх кита */
-.ui {
-  --u-accent-text: var(--accent-text-tone);
-  --u-soft: color-mix(in oklab, var(--u-muted) 80%, var(--u-bg));
-
-  --bg: var(--u-bg);
-  --surface: var(--u-bg);
-  --surface-2: var(--u-bg);
-  --surface-hover: var(--u-fill-2);
-  --surface-sunk: var(--u-fill-2);
-  --line: var(--u-line);
-  --line-strong: var(--u-line-2);
-  --ink: var(--u-ink);
-  --ink-2: var(--u-text-2);
-  --muted: var(--u-muted);
-  --faint: var(--u-soft);
-  --accent: var(--u-accent);
-  --accent-ink: var(--u-accent-ink);
-  --accent-soft: var(--u-tint);
-  --accent-text: var(--u-accent-text);
-  --accent-hover: color-mix(in oklab, var(--u-accent) 86%, var(--u-ink));
-  --warn: var(--warn-tone);
-  --warn-line: var(--ochre);
-  --warn-fill: color-mix(in oklab, var(--ochre) 14%, var(--u-bg));
-  --danger: var(--danger-tone);
-  --danger-line: var(--red);
-  --danger-fill: color-mix(in oklab, var(--red) 13%, var(--u-bg));
-  --info: var(--info-tone);
-  --info-fill: color-mix(in oklab, var(--blue) 13%, var(--u-bg));
-  --paper: var(--paper-tone);
-  --shadow-overlay: var(--u-shadow);
-  --shadow-page: var(--u-shadow-sm);
-  --scrim: color-mix(in oklab, #000 var(--scrim-a), transparent);
-  --focus: 0 0 0 3px color-mix(in oklab, var(--u-accent) 32%, transparent);
-
-  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 17px; --fs-2xl: 24px;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
-  --r-xs: 4px; --r-sm: 6px; --r-md: 7px; --r-lg: 12px; --r-xl: 12px;
-  --header-h: 48px; --tabbar-h: 56px;
-}
-
-/* ---------- основа страницы */
+/* ---------- основа */
 *, *::before, *::after { box-sizing: border-box; }
-html { background: var(--fx-bg); -webkit-text-size-adjust: 100%; }
-body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink); }
+html { background: var(--desk); -webkit-text-size-adjust: 100%; }
+body.ui {
+  margin: 0; min-height: 100vh;
+  font: 400 var(--t-14)/20px var(--font);
+  letter-spacing: 0;
+  color: var(--ink); background: var(--desk);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
 #app { min-height: 100vh; }
-.ui h1, .ui h2, .ui h3, .ui h4, .ui p, .ui dl, .ui dd { margin: 0; }
-.ui h1, .ui h2, .ui h3, .ui h4 { font-size: inherit; font-weight: 500; letter-spacing: -0.01em; }
-.ui a { color: inherit; text-decoration: underline; text-decoration-color: var(--u-line-2); text-underline-offset: 3px; }
-.ui a:hover { text-decoration-color: currentColor; }
-.ui :is(input, select, textarea) { font: inherit; color: inherit; }
-.ui table { border-collapse: collapse; }
-.ui img, .ui canvas { display: block; }
-.ui svg.lucide { stroke-width: 1.6; flex: none; }
-.ui ::selection { background: color-mix(in oklab, var(--u-accent) 30%, transparent); }
-.ui :focus { outline: none; }
-.ui :focus-visible { outline: 2px solid color-mix(in oklab, var(--u-accent) 75%, transparent); outline-offset: 2px; border-radius: 6px; }
-/* кит рисует картинки и ставит кнопкам стрелку; в живом интерфейсе кнопки нажимаются */
-.ui button:not(:disabled), .ui [role="button"], .ui summary, .ui label.check { cursor: pointer; }
+:where(.ui) :is(h1, h2, h3, h4, p, dl, dd, figure, blockquote) { margin: 0; }
+:where(.ui) :is(ul, ol, li, article, aside, nav) { margin: 0; padding: 0; list-style: none; }
+:where(.ui) mark { background: none; color: inherit; }
+:where(.ui) :is(h1, h2, h3, h4) { font-size: inherit; font-weight: 600; }
+:where(.ui) a { color: inherit; text-decoration: none; }
+:where(.ui) :is(input, select, textarea, button) { font: inherit; color: inherit; letter-spacing: inherit; }
+:where(.ui) button { background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+:where(.ui) button:disabled { cursor: default; }
+:where(.ui) table { border-collapse: collapse; }
+:where(.ui) fieldset { min-width: 0; }
+:where(.ui) legend { padding: 0; }
+:where(.ui) :is(img, canvas) { display: block; }
+:where(.ui) svg { display: block; flex: none; }
+:where(.ui) svg.lucide { width: 16px; height: 16px; stroke-width: 1.75; flex: none; }
+:where(.ui) ::selection { background: color-mix(in oklab, var(--source) 32%, transparent); }
+:where(.ui) :focus { outline: none; }
+/* фокус с клавиатуры: та же зелёная рамка, что вокруг числа на странице */
+:where(.ui) :focus-visible { outline: 2px solid var(--source); outline-offset: 2px; }
 
 .num { font-variant-numeric: tabular-nums; }
-.mono { font-family: var(--ui-mono); font-size: 12px; letter-spacing: 0; }
-.muted { color: var(--u-muted); }
-.faint { color: var(--u-soft); }
+.mono { font-family: var(--mono); font-size: 12px; }
+.muted, .faint { color: var(--pencil); }
 .nowrap { white-space: nowrap; }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -74,174 +46,172 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
 .row { display: flex; align-items: center; gap: 8px; }
 .stack { display: flex; flex-direction: column; gap: 8px; }
 
-/* ---------- кнопки: ui-btn кита плюс живые состояния */
-.ui-btn, .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
-  height: 28px; padding: 0 10px; border: 0; border-radius: 7px;
-  font: 500 13px/1 var(--ui-font); white-space: nowrap; text-decoration: none;
-  background: var(--u-ink); color: var(--u-bg);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--u-bg) 14%, transparent), 0 1px 2px color-mix(in oklab, var(--u-sh) 60%, transparent);
-  transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease), box-shadow 160ms var(--u-ease), transform 120ms var(--u-ease);
+/* ---------- кнопки: главное действие зелёное (одно на экран), важное чернилами, остальное словом */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none;
+  height: 32px; padding: 0 12px; border: 1px solid color-mix(in oklab, var(--ink) 22%, transparent); border-radius: 6px;
+  background: transparent; color: var(--ink);
+  font-weight: 500; font-size: var(--t-14); line-height: 1; white-space: nowrap;
+  transition: background-color 140ms var(--ease), border-color 140ms var(--ease), color 140ms var(--ease);
 }
-.ui-btn svg, .btn svg { width: 14px; height: 14px; }
-.ui-btn:hover, .btn:hover { background: color-mix(in oklab, var(--u-ink) 86%, var(--u-bg)); text-decoration: none; }
-.ui-btn:active, .btn:active { transform: scale(0.98); }
-/* вторичная: рамка на фоне окна (ui-btn--ghost) */
-.btn, .ui-btn--ghost { background: var(--u-bg); color: var(--u-ink); box-shadow: inset 0 0 0 1px var(--u-line-2), 0 1px 2px color-mix(in oklab, var(--u-sh) 30%, transparent); }
-.btn:hover, .ui-btn--ghost:hover { background: var(--u-fill-2); }
-/* основная: чернила, как в ките */
-.btn--primary { background: var(--u-ink); color: var(--u-bg); box-shadow: inset 0 1px 0 color-mix(in oklab, var(--u-bg) 14%, transparent), 0 1px 2px color-mix(in oklab, var(--u-sh) 60%, transparent); }
-.btn--primary:hover { background: color-mix(in oklab, var(--u-ink) 86%, var(--u-bg)); }
-/* одно зелёное действие на экран */
-.btn--accent, .ui-btn--accent { background: var(--u-accent); color: var(--u-accent-ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 1px 2px color-mix(in oklab, var(--u-sh) 60%, transparent); }
-.btn--accent:hover, .ui-btn--accent:hover { background: color-mix(in oklab, var(--u-accent) 88%, #000); }
-.btn--ghost, .ui-btn--quiet { background: transparent; color: var(--u-muted); box-shadow: none; }
-.btn--ghost:hover, .ui-btn--quiet:hover { background: var(--u-fill-2); color: var(--u-ink); }
-.btn--danger { color: var(--danger); }
-.btn--danger:hover { color: var(--danger); }
-.btn--sm { height: 24px; padding: 0 8px; }
-.btn--lg { height: 36px; padding: 0 14px; font-size: 14px; }
-.btn--icon { width: 28px; padding: 0; }
-.btn--icon.btn--sm { width: 24px; }
+.btn:hover { background: var(--hover); border-color: color-mix(in oklab, var(--ink) 34%, transparent); }
+.btn:active { background: color-mix(in oklab, var(--ink) 8%, var(--desk)); }
+.btn--primary { background: var(--ink); color: var(--desk); border-color: var(--ink); }
+.btn--primary:hover { background: color-mix(in oklab, var(--ink) 84%, var(--desk)); border-color: transparent; }
+.btn--accent { background: #07854A; color: #FFFFFF; border-color: #07854A; transition: box-shadow 140ms var(--ease), transform 80ms var(--ease); }
+/* один зелёный #07854A в обеих темах: наведение и нажатие показаны ореолом и сдвигом, а не другим оттенком */
+.btn--accent:hover { background: #07854A; border-color: #07854A; box-shadow: 0 0 0 3px rgb(7 133 74 / .3); }
+.btn--accent:active { background: #07854A; transform: translateY(1px); }
+/* словом: без рамки, карандашом; при наведении чернила */
+.btn--ghost { border-color: transparent; color: var(--pencil); padding: 0 8px; }
+.btn--ghost:hover { background: transparent; border-color: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.btn--danger, .btn--danger:hover { color: var(--danger); }
+.btn--sm { height: 28px; padding: 0 10px; font-size: 13px; }
+.btn--ghost.btn--sm { padding: 0 6px; }
+.btn--lg { height: 40px; padding: 0 18px; font-size: 15px; }
+.btn--icon { width: 32px; padding: 0; }
+.btn--icon.btn--sm { width: 28px; }
+.btn--icon.btn--ghost:hover { text-decoration: none; background: var(--hover); }
 .btn--block { width: 100%; }
-.ui-btn:disabled, .btn:disabled, .btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .4; pointer-events: none; }
+/* недоступная главная кнопка не бледно-зелёная, а нейтральная: зелёный есть только у того, что можно нажать */
+.btn--accent:disabled, .btn--accent[aria-disabled="true"] { opacity: 1; background: color-mix(in oklab, var(--ink) 8%, transparent); border-color: transparent; color: var(--pencil); }
 
-/* ---------- поля: как поиск в окне кита */
+/* ---------- поля: залитые полкой, без рамки; фокус зелёной рамкой */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field__label { font-size: 13px; font-weight: 500; color: var(--u-text-2); }
-.field__hint { font-size: 12px; line-height: 16px; color: var(--u-soft); }
-.field__error { font-size: 12px; line-height: 16px; color: var(--danger); }
+.field__label { font-size: 13px; font-weight: 500; color: var(--ink); }
+.field__hint { font-size: var(--t-12); line-height: 16px; color: var(--pencil); }
+.field__error { font-size: var(--t-12); line-height: 16px; color: var(--danger); }
 .input, .select, .textarea {
-  width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 7px;
-  background: var(--u-bg); color: var(--u-ink); font-size: 13px;
-  box-shadow: inset 0 0 0 1px var(--u-line-2);
-  transition: box-shadow 160ms var(--u-ease);
+  width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: 6px;
+  background: var(--shelf); color: var(--ink); font-size: var(--t-14);
+  box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 140ms var(--ease), background-color 140ms var(--ease);
 }
-.textarea { height: auto; min-height: 64px; padding: 7px 10px; line-height: 20px; resize: vertical; }
-.select { appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--u-muted) 50%), linear-gradient(135deg, var(--u-muted) 50%, transparent 50%); background-position: calc(100% - 14px) 50%, calc(100% - 10px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
-.input::placeholder, .textarea::placeholder { color: var(--u-soft); }
-.input:hover, .select:hover, .textarea:hover { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--u-ink) 28%, transparent); }
-.input:focus, .select:focus, .textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--u-accent), 0 0 0 3px color-mix(in oklab, var(--u-accent) 22%, transparent); }
-.input[aria-invalid="true"], .textarea[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--red); }
-.input--sm, .select--sm { height: 28px; }
-.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
-.check input, .cb { width: 16px; height: 16px; margin: 0; accent-color: var(--u-ink); }
+.textarea { height: auto; min-height: 72px; padding: 8px 12px; line-height: 20px; resize: vertical; }
+.select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--pencil) 50%), linear-gradient(135deg, var(--pencil) 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 11px) 52%; background-size: 4px 4px; background-repeat: no-repeat; }
+.input::placeholder, .textarea::placeholder { color: var(--pencil); }
+.input:hover, .select:hover, .textarea:hover { box-shadow: inset 0 0 0 1px var(--rule-mid); }
+.input:focus, .select:focus, .textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--source); }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--red); }
+.input--sm, .select--sm { height: 30px; font-size: 13px; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-14); }
+.check input[type="checkbox"], .cb {
+  appearance: none; display: inline-grid; place-items: center; flex: none;
+  width: 16px; height: 16px; margin: 0; border-radius: 3px; background: transparent; cursor: pointer;
+  box-shadow: inset 0 0 0 1.5px var(--rule-mid); transition: box-shadow 120ms var(--ease), background-color 120ms var(--ease);
+}
+.check input[type="checkbox"]:hover, .cb:hover { box-shadow: inset 0 0 0 1.5px var(--pencil); }
+.check input[type="checkbox"]:checked, .cb:checked { background: var(--ink); box-shadow: none; }
+.check input[type="checkbox"]:checked::after, .cb:checked::after { content: ""; width: 4px; height: 8px; margin-top: -2px; border: solid var(--desk); border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); }
+.check input[type="checkbox"]:disabled, .cb:disabled { opacity: .4; cursor: default; }
+.check input[type="radio"], .rb { flex: none; appearance: none; width: 16px; height: 16px; margin: 0; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px var(--rule-mid); transition: box-shadow 120ms var(--ease); }
+.check input[type="radio"]:hover, .rb:hover { box-shadow: inset 0 0 0 1.5px var(--pencil); }
+.check input[type="radio"]:checked, .rb:checked { box-shadow: inset 0 0 0 5px var(--ink); }
 
-/* ---------- статусы: точка и слово, тихо; акцент только там, где что-то происходит (ui-win__st кита) */
-.chip {
-  display: inline-flex; align-items: center; gap: 6px; flex: none;
-  height: 22px; padding: 0 8px; border-radius: 6px;
-  font-size: 13px; font-weight: 500; line-height: 1; white-space: nowrap;
-  color: var(--u-muted); background: transparent; box-shadow: inset 0 0 0 1px var(--u-line-2);
-}
-.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .6; flex: none; }
-.chip--plain::before { display: none; }
-.chip--plain { color: var(--u-text-2); background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); }
-/* обычные состояния без рамки: точка и слово; рамка и заливка остаются у того, что ждёт человека */
-.chip--ok { padding: 0; color: var(--u-muted); box-shadow: none; }
-.chip--ok::before { background: var(--u-accent); opacity: 1; }
-.chip--run { color: var(--u-accent-text); background: var(--u-tint); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--u-accent) 22%, transparent); }
-.chip--run::before { width: 8px; height: 8px; background: none; border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent); border-top-color: currentColor; opacity: 1; animation: ui-spin 800ms linear infinite; }
-.chip--wait { color: var(--u-ink); background: var(--u-fill-2); box-shadow: inset 0 0 0 1px var(--u-line-2); }
-.chip--wait::before { background: var(--u-ink); opacity: 1; }
-.chip--warn { color: var(--u-ink); box-shadow: inset 0 0 0 1px var(--u-line-2); }
-.chip--warn::before { background: var(--ochre); opacity: 1; }
-.chip--error { color: var(--u-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 45%, transparent); }
-.chip--error::before { background: var(--red); opacity: 1; }
-.chip--off { padding: 0; color: var(--u-soft); box-shadow: none; }
+/* ---------- статус словом. Цвет только у того, что требует решения; идущая работа с вращением */
+.chip { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-weight: 500; color: var(--pencil); }
+.chip--ok, .chip--off, .chip--plain, .chip--idle { font-weight: 400; color: var(--pencil); }
+.chip--wait { color: var(--ink); font-weight: 600; }
+.chip--warn { color: var(--warn); font-weight: 600; }
+.chip--error { color: var(--danger); font-weight: 600; }
+.chip--run { color: var(--accent-text); }
+.chip--run::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent); border-top-color: currentColor; animation: ui-spin 800ms linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
 
-.count {
-  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 5px; font-size: 12px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums;
-  color: var(--u-muted); background: var(--u-fill-2);
-}
-.count--warn { color: var(--u-ink); background: color-mix(in oklab, var(--ochre) 22%, var(--u-bg)); }
+.count { font-weight: 500; color: var(--pencil); font-variant-numeric: tabular-nums; }
+.count--warn { color: var(--warn); font-weight: 600; }
 
-/* ---------- панели и таблицы: окно кита, строки 44 px */
-.panel { background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; }
-.table { width: 100%; font-size: 13px; line-height: 16px; }
-.table th {
-  position: sticky; top: 0; z-index: 1; height: 32px; padding: 0 12px; text-align: left;
-  font-weight: 400; color: var(--u-soft); background: var(--u-bg); white-space: nowrap;
-  box-shadow: inset 0 -1px 0 var(--u-line);
+/* значение, к которому есть замечание: волнистое подчёркивание, как правка корректора */
+.flag { text-decoration: underline wavy var(--ochre); text-decoration-thickness: 1.5px; text-underline-offset: 4px; text-decoration-skip-ink: none; }
+.flag--error { text-decoration-color: var(--red); }
+
+/* ---------- таблицы как в статьях: линейка сверху, тонкая под шапкой, линейка снизу; строки без сетки */
+.table { width: 100%; font-size: var(--t-14); line-height: 20px; }
+.table thead th {
+  height: 38px; padding: 0 12px 8px; text-align: left; vertical-align: bottom;
+  font-size: 13px; font-weight: 500; color: var(--pencil); white-space: nowrap;
+  box-shadow: inset 0 1.5px 0 var(--rule-strong), inset 0 -1px 0 var(--rule-mid);
+  background: var(--desk); position: sticky; top: 0; z-index: 1;
 }
-.table td { height: 44px; padding: 6px 12px; vertical-align: middle; box-shadow: inset 0 -1px 0 var(--u-line); }
-.table tr:last-child td { box-shadow: none; }
-.table tbody tr { transition: background-color 160ms var(--u-ease); }
+.table td { height: 44px; padding: 6px 12px; vertical-align: middle; }
+.table tbody tr:last-child td { box-shadow: inset 0 -1.5px 0 var(--rule-strong); }
+.table tbody tr { transition: background-color 120ms var(--ease); }
 .table tbody tr.is-link { cursor: pointer; }
-.table tbody tr.is-link:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
-.table tbody tr.is-selected { background: var(--u-tint); }
+.table tbody tr.is-link:hover { background: var(--hover); }
+.table tbody tr.is-selected { background: var(--picked); }
+.table th:first-child, .table td:first-child { padding-left: 0; }
+.table th:last-child, .table td:last-child { padding-right: 0; }
 .table .t-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.table .t-check { width: 36px; padding-right: 0; }
+.table .t-check { width: 32px; }
+/* последняя колонка с удалением: своя ширина и отступ, чтобы иконка не наезжала на соседнее значение */
+.table .t-act { width: 44px; padding-left: 12px; text-align: right; }
+.row-del { color: var(--pencil); }
+.row-del:hover:not(:disabled) { color: var(--danger); }
 
-/* ---------- страница внутри окна: заголовок строкой кита и содержимое */
-.page { padding: 20px 24px 40px; max-width: 1480px; margin: 0 auto; }
-.page__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 32px; margin-bottom: 16px; }
-.page__title { font-size: 17px; line-height: 24px; font-weight: 500; letter-spacing: -0.01em; }
-.page__title .count { margin-left: 8px; vertical-align: 2px; }
+/* ---------- страница */
+.page { padding: 28px 32px 56px; }
+.page__head { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; min-height: 40px; margin-bottom: 20px; }
+.page__title { font-size: var(--t-26); line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-.empty { padding: 40px 24px; text-align: center; color: var(--u-muted); }
-.empty h3 { color: var(--u-ink); font-size: 15px; margin-bottom: 6px; }
-.empty p { max-width: 46ch; margin: 0 auto 16px; }
+/* вкладки словами: выбранная чернилами с линейкой снизу */
+.tabs { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+.tab { position: relative; display: inline-flex; align-items: baseline; gap: 6px; height: 32px; padding: 6px 0 0; border: 0; background: none; color: var(--pencil); font-weight: 500; white-space: nowrap; transition: color 140ms var(--ease); }
+.tab:hover { color: var(--ink); }
+.tab.is-on { color: var(--ink); }
+.tab.is-on::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink); border-radius: 1px; }
+.tab__n { font-weight: 400; color: var(--pencil); font-variant-numeric: tabular-nums; }
 
-.skeleton { display: block; border-radius: 6px; background: var(--u-skel); animation: skel 1.4s var(--u-ease) infinite; }
-@keyframes skel { 50% { opacity: .55; } }
+.empty { padding: 48px 0; max-width: 520px; color: var(--pencil); }
+.empty h3 { color: var(--ink); font-size: var(--t-17); line-height: 24px; margin-bottom: 6px; }
+.empty p { margin-bottom: 18px; }
 
-/* бумага: страницы PDF и цитаты, приглушённый бежевый в обеих темах */
+.skeleton { display: block; border-radius: 4px; background: color-mix(in oklab, var(--ink) 8%, var(--desk)); animation: skel 1.4s var(--ease) infinite; }
+@keyframes skel { 50% { opacity: .5; } }
+
+/* бумага: фрагменты статей набраны так же, как в источнике */
 .quote {
-  margin: 0; padding: 10px 12px; border-radius: 8px;
-  background: var(--paper); color: #24231F; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .06);
-  font-family: "Liberation Serif", "Times New Roman", Georgia, serif; font-size: 14px; line-height: 21px;
+  margin: 0; padding: 10px 14px; border-radius: 3px;
+  background: var(--paper); color: #24231F;
+  font-family: var(--serif); font-size: 15px; line-height: 22px;
 }
-.quote mark { background: color-mix(in oklab, #07854A 22%, transparent); color: inherit; padding: 1px 2px; margin: 0 -2px; border-radius: 3px; box-shadow: inset 0 -1.5px 0 #07854A; }
+.quote mark { background: rgb(7 133 74 / .16); color: inherit; padding: 0 2px; margin: 0 -2px; box-shadow: inset 0 0 0 1.5px var(--source); border-radius: 2px; }
 
-.kv { display: grid; grid-template-columns: minmax(104px, 36%) 1fr; gap: 6px 12px; font-size: 13px; line-height: 20px; }
-.kv dt { color: var(--u-muted); }
+.kv { display: grid; grid-template-columns: minmax(96px, 34%) 1fr; gap: 6px 14px; font-size: 13px; line-height: 20px; }
+.kv dt { color: var(--pencil); }
 .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
-/* ---------- каркас приложения: строка окна сверху, боковая навигация, рабочая область */
-.shell { min-height: 100vh; display: grid; grid-template-rows: var(--header-h) minmax(0, 1fr); }
-.shell__bar {
-  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; min-width: 0;
-  height: var(--header-h); padding: 0 12px 0 14px; background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line);
+/* ---------- каркас: одна строка сверху, разделы вкладками; без бокового меню */
+.shell { min-height: 100vh; }
+.bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 24px; height: 52px; padding: 0 20px 0 24px;
+  background: var(--desk); box-shadow: inset 0 -1px 0 var(--rule);
 }
-.shell__brand { display: flex; align-items: center; gap: 8px; flex: none; font-weight: 500; color: var(--u-ink); text-decoration: none !important; }
-.shell__body { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 0; }
-.shell__side { position: sticky; top: var(--header-h); align-self: start; height: calc(100vh - var(--header-h)); overflow: auto; display: flex; flex-direction: column; gap: 1px; padding: 8px; border-right: 1px solid var(--u-line); }
-.shell__main { min-width: 0; min-height: 0; }
-.side__nav {
-  display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 6px;
-  font-size: 13px; line-height: 16px; color: var(--u-muted); text-decoration: none !important; white-space: nowrap;
-  transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease);
-}
-.side__nav svg { width: 15px; height: 15px; }
-.side__nav:hover { background: var(--u-fill); color: var(--u-ink); }
-.side__nav.router-link-active, .side__nav.is-on { background: var(--u-fill-2); color: var(--u-ink); font-weight: 500; }
-.side__nav .count--warn { margin-left: auto; }
+.bar__brand { display: flex; align-items: center; gap: 10px; flex: none; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.bar__nav { display: flex; align-self: stretch; gap: 22px; }
+.bar__tab { position: relative; display: flex; align-items: center; gap: 6px; color: var(--pencil); font-weight: 500; white-space: nowrap; transition: color 140ms var(--ease); }
+.bar__tab:hover { color: var(--ink); }
+.bar__tab.router-link-active, .bar__tab.is-on { color: var(--ink); }
+.bar__tab.router-link-active::after, .bar__tab.is-on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink); }
+.bar__end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: 1fr 1fr; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--u-fill); box-shadow: inset 0 1px 0 var(--u-line); }
-.tabbar__item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--u-muted); font-size: 12px; font-weight: 500; text-decoration: none !important; }
-.tabbar__item svg { width: 20px; height: 20px; }
-.tabbar__item.router-link-active { color: var(--u-ink); }
-.tabbar__count { position: absolute; top: 6px; left: calc(50% + 6px); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: 1fr 1fr; height: calc(60px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--desk); box-shadow: inset 0 1px 0 var(--rule); }
+.tabbar__item { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--pencil); font-size: 15px; font-weight: 500; }
+.tabbar__item.router-link-active { color: var(--ink); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
   .ui *, .ui *::before, .ui *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
 
-@media (max-width: 1023px) {
-  .shell__body { grid-template-columns: 64px minmax(0, 1fr); }
-  .shell__side .side__text { display: none; }
-  .side__nav { justify-content: center; padding: 0; }
-}
 @media (max-width: 719px) {
-  .shell__body { grid-template-columns: minmax(0, 1fr); }
-  .shell__side { display: none; }
-  .page { padding: 14px 14px calc(var(--tabbar-h) + 24px); }
-  .input, .select, .textarea { height: 40px; font-size: 16px; }
+  .page__head .tabs, .page__head .seg { margin-right: -16px; padding-right: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .page { padding: 18px 16px calc(84px + env(safe-area-inset-bottom)); }
+  .page__title { font-size: var(--t-21); line-height: 28px; }
+  .bar { gap: 12px; height: 56px; padding: 0 12px 0 16px; }
+  .btn { height: 44px; padding: 0 16px; }
+  .btn--sm { height: 40px; }
+  .btn--icon { width: 44px; }
+  .input, .select, .textarea { height: 44px; font-size: 16px; }
   .textarea { height: auto; }
-  .ui-btn, .btn { height: 36px; padding: 0 12px; }
-  .btn--sm { height: 32px; }
-  .btn--icon { width: 36px; }
 }

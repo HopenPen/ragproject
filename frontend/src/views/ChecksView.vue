@@ -4,7 +4,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ShieldCheck } from '@lucide/vue'
 import Segmented from '../components/ui/Segmented.vue'
 import Chip from '../components/ui/Chip.vue'
 import IssueCard from '../components/app/IssueCard.vue'
@@ -70,7 +69,7 @@ function act (it) {
   router.push({ name: 'article', params: { corpusId: ws.corpus.id, documentId: it.document_id }, query })
 }
 const ACT = { classification: 'Решить тему', scope: 'Решить', candidate: 'Сравнить версии', source: 'Сверить источник', issue: 'Открыть' }
-const KIND_TONE = { classification: 'wait', scope: 'wait', candidate: 'wait', source: 'off', issue: 'warn' }
+const KIND_TONE = { classification: 'wait', scope: 'wait', candidate: 'wait', source: 'plain', issue: 'warn' }
 const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues.value.length, queue: queue.value.length }))
 </script>
 
@@ -93,12 +92,12 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
           <option value="rag-v1">RAG-системы</option>
         </select>
       </template>
-      <button v-if="editable && !ui.mobile" class="btn btn--accent" type="button" :disabled="!!runningJob" :title="lastValidate ? `Последняя проверка ${fmtDate(lastValidate.finished_at || lastValidate.created_at)}` : ''" @click="validate"><ShieldCheck />{{ runningJob ? 'Проверяю…' : 'Запустить проверку' }}</button>
+      <button v-if="editable && !ui.mobile" class="btn btn--accent" type="button" :disabled="!!runningJob" :title="lastValidate ? `Последняя проверка ${fmtDate(lastValidate.finished_at || lastValidate.created_at)}` : ''" @click="validate">{{ runningJob ? 'Проверяю…' : 'Запустить проверку' }}</button>
     </div>
 
     <template v-if="tab === 'issues'">
-      <div v-if="loading" class="stack"><div v-for="i in 3" :key="i" class="skeleton" style="height: 120px; border-radius: 12px" /></div>
-      <div v-else-if="!issues.length" class="panel empty">
+      <div v-if="loading" class="checks__list"><div v-for="i in 3" :key="i" class="checks__ghost"><span class="skeleton" style="width: 40%; height: 18px" /><span class="skeleton" style="width: 70%; height: 14px" /></div></div>
+      <div v-else-if="!issues.length" class="empty">
         <h3>{{ status === 'open' ? 'Открытых замечаний нет' : 'Здесь пусто' }}</h3>
         <p>Замечания появляются после проверки: сходимость PCE, Jsc по EQE, шкалы метрик RAG, источники значений.</p>
       </div>
@@ -109,18 +108,28 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
     </template>
 
     <template v-else>
-      <div v-if="!queue.length && !loading" class="panel empty">
+      <div v-if="!queue.length && !loading" class="empty">
         <h3>Очередь пуста</h3>
         <p>Сюда попадают статьи с неуверенной темой, новые версии после повторного извлечения, сомнительные источники и открытые замечания.</p>
       </div>
-      <ul v-else class="panel queue">
-        <li v-for="it in queue" :key="it.id" class="queue__row">
-          <span class="queue__kind"><Chip :tone="KIND_TONE[it.kind]" :text="REVIEW_KIND[it.kind]" /></span>
-          <b class="queue__code">{{ it.publication_code }}</b>
-          <span class="queue__sub">
-            <span class="queue__text">{{ it.summary }}</span>
-            <span class="queue__title">{{ it.title }}<template v-if="it.profile">, {{ profileShort(it.profile) }}</template></span>
-          </span>
+      <table v-else-if="!ui.mobile" class="table queue">
+        <thead><tr><th class="queue__kind">Что</th><th class="queue__code">Код</th><th>Суть</th><th class="queue__act"><span class="visually-hidden">Действие</span></th></tr></thead>
+        <tbody>
+          <tr v-for="it in queue" :key="it.id">
+            <td><Chip :tone="KIND_TONE[it.kind]" :text="REVIEW_KIND[it.kind]" /></td>
+            <td><b>{{ it.publication_code }}</b></td>
+            <td class="queue__sub">
+              <span class="queue__text">{{ it.summary }}</span>
+              <span class="queue__title">{{ it.title }}<template v-if="it.profile">, {{ profileShort(it.profile) }}</template></span>
+            </td>
+            <td class="queue__act"><button class="btn btn--sm" :class="{ 'btn--primary': it.kind === 'classification' && editable }" type="button" :disabled="(it.kind === 'classification' || it.kind === 'scope') && !editable" @click="act(it)">{{ ACT[it.kind] }}</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <ul v-else class="mqueue">
+        <li v-for="it in queue" :key="it.id" class="mqueue__row">
+          <span class="mqueue__top"><b>{{ it.publication_code }}</b><Chip :tone="KIND_TONE[it.kind]" :text="REVIEW_KIND[it.kind]" /></span>
+          <span class="mqueue__text">{{ it.summary }}</span>
           <button class="btn btn--sm" :class="{ 'btn--primary': it.kind === 'classification' && editable }" type="button" :disabled="(it.kind === 'classification' || it.kind === 'scope') && !editable" @click="act(it)">{{ ACT[it.kind] }}</button>
         </li>
       </ul>
@@ -130,24 +139,31 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
 </template>
 
 <style>
-.checks { max-width: 1080px; }
-.checks__sel { width: auto; min-width: 150px; }
-.checks__skip { margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--u-soft); }
-.checks__list { display: flex; flex-direction: column; gap: 8px; }
-.queue { overflow: hidden; }
-.queue__row { display: grid; grid-template-columns: 150px 56px minmax(0, 1fr) auto; align-items: center; gap: 0 12px; min-height: 56px; padding: 8px 12px 8px 16px; }
-.queue__row + .queue__row { box-shadow: inset 0 1px 0 var(--u-line); }
-.queue__code { font-weight: 500; }
-.queue__sub { display: flex; flex-direction: column; min-width: 0; }
-.queue__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.queue__title { font-size: 12px; line-height: 16px; color: var(--u-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.checks { max-width: 1120px; }
+.checks__sel { width: auto; min-width: 156px; }
+/* замечания: список правок корректора, линейки как в таблице статьи */
+.checks__list { box-shadow: inset 0 1.5px 0 var(--rule-strong), inset 0 -1.5px 0 var(--rule-strong); }
+.checks__list > * + * { box-shadow: inset 0 1px 0 var(--rule); }
+.checks__ghost { display: flex; flex-direction: column; gap: 10px; padding: 22px 0; }
+.checks__skip { margin-top: 14px; font-size: 13px; line-height: 18px; color: var(--pencil); max-width: 72ch; }
+
+.queue__kind { width: 168px; }
+.queue__code { width: 72px; }
+.queue__act { width: 1%; text-align: right; white-space: nowrap; }
+.queue td { height: 56px; }
+.queue__sub { min-width: 0; }
+.queue__text { display: block; max-width: 72ch; }
+.queue__title { display: block; max-width: 72ch; font-size: 13px; line-height: 18px; color: var(--pencil); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.mqueue { box-shadow: inset 0 1.5px 0 var(--rule-strong); }
+.mqueue__row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 0 16px; }
+.mqueue__row + .mqueue__row { box-shadow: inset 0 1px 0 var(--rule); }
+.mqueue__top { display: flex; align-items: baseline; gap: 12px; width: 100%; }
+.mqueue__top .chip { margin-left: auto; }
+.mqueue__text { color: var(--pencil); }
+.mqueue__row .btn { margin-top: 4px; }
 @media (max-width: 719px) {
-  .page__head .seg { order: 5; flex-basis: 100%; }
-  .queue__row { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 6px 10px; padding: 12px 14px; }
-  .queue__kind { grid-column: 1; grid-row: 1; }
-  .queue__code { grid-column: 2; grid-row: 1; justify-self: end; }
-  .queue__sub { grid-column: 1 / 3; grid-row: 2; }
-  .queue__text, .queue__title { white-space: normal; }
-  .queue__row .btn { grid-column: 1 / 3; grid-row: 3; }
+  .checks .page__head .seg { order: 5; flex-basis: 100%; }
+  .checks__sel { flex: 1; }
 }
 </style>

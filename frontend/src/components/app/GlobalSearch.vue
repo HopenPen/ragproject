@@ -61,7 +61,6 @@ function expand () { expanded.value = true; setTimeout(() => input.value?.focus(
       <label class="gsearch__box">
         <Search class="gsearch__icon" />
         <input ref="input" v-model="q" class="gsearch__input" type="search" placeholder="Поиск по тексту статей" aria-label="Поиск по тексту статей" autocomplete="off" @focus="open = true" @keydown="onKey">
-        <kbd v-if="!compact && !q" class="gsearch__kbd">/</kbd>
         <button v-if="compact" class="btn btn--ghost btn--icon btn--sm" type="button" aria-label="Закрыть поиск" @click="close"><X /></button>
       </label>
       <div v-if="(open || expanded) && q.trim().length >= 2" class="gsearch__panel" role="listbox">
@@ -78,25 +77,25 @@ function expand () { expanded.value = true; setTimeout(() => input.value?.focus(
 
 <style>
 .gsearch { position: relative; }
-.gsearch__box { display: flex; align-items: center; gap: 8px; width: 240px; height: 30px; padding: 0 4px 0 9px; border-radius: 7px; background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2); cursor: text; transition: box-shadow 160ms var(--u-ease); }
-.gsearch__box:focus-within { box-shadow: inset 0 0 0 1px var(--u-accent), 0 0 0 3px color-mix(in oklab, var(--u-accent) 22%, transparent); }
-.gsearch__icon { width: 14px; height: 14px; color: var(--u-muted); flex: none; }
-.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 13px; color: var(--u-ink); }
-.gsearch__input::placeholder { color: var(--u-soft); }
+.gsearch__box { display: flex; align-items: center; gap: 8px; width: 260px; height: 34px; padding: 0 6px 0 11px; border-radius: 6px; background: var(--shelf); cursor: text; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 140ms var(--ease); }
+.gsearch__box:hover { box-shadow: inset 0 0 0 1px var(--rule-mid); }
+.gsearch__box:focus-within { box-shadow: inset 0 0 0 2px var(--source); }
+.gsearch__icon { width: 15px !important; height: 15px !important; color: var(--pencil); flex: none; }
+.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); }
+.gsearch__input::placeholder { color: var(--pencil); }
 .gsearch__input::-webkit-search-cancel-button { display: none; }
-.gsearch__kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; font: 500 12px/1 var(--ui-font); color: var(--u-muted); background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2), inset 0 -1px 0 var(--u-line); }
-.gsearch__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 45; width: min(540px, 92vw); max-height: 70vh; overflow: auto; padding: 6px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); }
-.gsearch__note { padding: 10px; color: var(--u-muted); }
-.gsearch__item { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: left; }
-.gsearch__item.is-active { background: var(--u-fill-2); }
-.gsearch__meta { display: flex; align-items: baseline; gap: 8px; color: var(--u-muted); }
-.gsearch__meta b { color: var(--u-ink); font-weight: 500; flex: none; }
+.gsearch__panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 45; width: min(560px, 92vw); max-height: 70vh; overflow: auto; padding: 6px; background: var(--float); border-radius: 10px; box-shadow: var(--shadow); }
+.gsearch__note { padding: 12px; color: var(--pencil); }
+.gsearch__item { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 6px; background: none; text-align: left; }
+.gsearch__item.is-active, .gsearch__item:hover { background: var(--hover); }
+.gsearch__meta { display: flex; align-items: baseline; gap: 10px; color: var(--pencil); }
+.gsearch__meta b { color: var(--ink); font-weight: 600; flex: none; }
 .gsearch__meta .ellipsis { flex: 1; }
-.gsearch__page { flex: none; color: var(--u-soft); }
-.gsearch__snip { display: block; margin-top: 2px; color: var(--u-text-2); }
-.gsearch__snip mark { background: var(--u-tint-2); color: var(--u-ink); border-radius: 3px; padding: 0 2px; }
-.gsearch.is-compact.is-expanded { position: fixed; inset: 0 0 auto 0; z-index: 46; padding: 8px 10px; background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
-.gsearch.is-compact.is-expanded .gsearch__box { width: 100%; height: 40px; }
-.gsearch.is-compact.is-expanded .gsearch__panel { position: fixed; left: 8px; right: 8px; top: 60px; width: auto; max-height: calc(100vh - 140px); }
+.gsearch__page { flex: none; font-size: 13px; }
+.gsearch__snip { display: block; margin-top: 4px; font-family: var(--serif); font-size: 14px; line-height: 20px; color: var(--ink); opacity: .86; }
+.gsearch__snip mark { background: rgb(7 133 74 / .18); color: inherit; border-radius: 2px; padding: 0 2px; box-shadow: inset 0 0 0 1px var(--source); }
+.gsearch.is-compact.is-expanded { position: fixed; inset: 0 0 auto 0; z-index: 46; padding: 8px 12px; background: var(--desk); box-shadow: inset 0 -1px 0 var(--rule); }
+.gsearch.is-compact.is-expanded .gsearch__box { width: 100%; height: 44px; }
+.gsearch.is-compact.is-expanded .gsearch__panel { position: fixed; left: 8px; right: 8px; top: 64px; width: auto; max-height: calc(100vh - 150px); }
 @media (max-width: 1180px) { .gsearch:not(.is-compact) .gsearch__box { width: 200px; } }
 </style>

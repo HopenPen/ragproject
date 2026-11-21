@@ -93,7 +93,7 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
     <form id="entity-form" class="eform" @submit.prevent="save">
       <div class="eform__grid">
         <label v-for="f in main" :key="f.name" class="field" :class="{ 'eform__wide': f.type === 'text' }">
-          <span class="field__label">{{ fieldLabel(f.name) }}<span v-if="f.required" class="eform__req" aria-label="обязательное">*</span><span v-if="f.unit" class="faint">, {{ fmtUnit(f.unit) }}</span></span>
+          <span class="field__label">{{ fieldLabel(f.name) }}<span v-if="f.required" class="eform__req" aria-label="обязательное">*</span><span v-if="f.unit" class="muted">, {{ fmtUnit(f.unit) }}</span></span>
           <select v-if="f.type === 'enum' || f.type === 'boolean' || (f.type === 'ref' && !f.multiple)" v-model="values[f.name]" class="select" :aria-invalid="!!errors[f.name]">
             <option value="">не указано</option>
             <template v-if="f.type === 'enum'"><option v-for="o in f.vocab" :key="o" :value="o">{{ valueLabel(f.name, o) }}</option></template>
@@ -109,7 +109,7 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
         <summary>Остальные поля ({{ rest.length }})</summary>
         <div class="eform__grid">
           <label v-for="f in rest" :key="f.name" class="field" :class="{ 'eform__wide': f.type === 'text' }">
-            <span class="field__label">{{ fieldLabel(f.name) }}<span v-if="f.unit" class="faint">, {{ fmtUnit(f.unit) }}</span></span>
+            <span class="field__label">{{ fieldLabel(f.name) }}<span v-if="f.unit" class="muted">, {{ fmtUnit(f.unit) }}</span></span>
             <select v-if="f.type === 'enum' || f.type === 'boolean' || (f.type === 'ref' && !f.multiple)" v-model="values[f.name]" class="select">
               <option value="">не указано</option>
               <template v-if="f.type === 'enum'"><option v-for="o in f.vocab" :key="o" :value="o">{{ valueLabel(f.name, o) }}</option></template>
@@ -123,7 +123,7 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
         </div>
       </details>
       <label class="field eform__reason">
-        <span class="field__label">Причина правки<span class="faint">, необязательно</span></span>
+        <span class="field__label">Причина правки<span class="muted">, необязательно</span></span>
         <textarea v-model="reason" class="textarea" rows="2" :aria-invalid="!!errors.reason" placeholder="Например: в таблице 1 указано 78.0, модель прочитала 75.0" />
         <span v-if="errors.reason" class="field__error">{{ errors.reason }}</span>
         <span v-else class="field__hint">Сохранение создаст новую версию графа. Прежняя останется в истории.</span>
@@ -131,19 +131,19 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
       <p v-if="common" class="field__error" role="alert">{{ common }}</p>
     </form>
     <template #footer>
-      <button class="btn" type="button" @click="emit('close')">Отмена</button>
+      <button class="btn btn--ghost" type="button" @click="emit('close')">Отмена</button>
       <button class="btn btn--primary" type="submit" form="entity-form" :disabled="busy || !dirty">{{ mode === 'create' ? 'Добавить запись' : 'Сохранить правку' }}</button>
     </template>
   </Modal>
 </template>
 
 <style>
-.eform__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.eform__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; }
 .eform__wide { grid-column: 1 / -1; }
 .eform__req { color: var(--danger); margin-left: 2px; }
-.eform__more { margin-top: 16px; }
-.eform__more summary { color: var(--u-text-2); font-weight: 500; margin-bottom: 12px; }
-.eform__more summary:hover { color: var(--u-ink); }
-.eform__reason { margin-top: 18px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--u-line); }
+.eform__more { margin-top: 18px; }
+.eform__more summary { width: max-content; color: var(--pencil); font-weight: 500; margin-bottom: 14px; cursor: pointer; }
+.eform__more summary:hover { color: var(--ink); }
+.eform__reason { margin-top: 20px; padding-top: 18px; box-shadow: inset 0 1px 0 var(--rule); }
 @media (max-width: 719px) { .eform__grid { grid-template-columns: 1fr; } }
 </style>

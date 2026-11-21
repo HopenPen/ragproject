@@ -3,7 +3,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Download, FileJson, ClipboardList, PackageCheck } from '@lucide/vue'
+import { Download } from '@lucide/vue'
 import Chip from '../components/ui/Chip.vue'
 import Progress from '../components/ui/Progress.vue'
 import Drawer from '../components/ui/Drawer.vue'
@@ -52,14 +52,16 @@ const tables = computed(() => {
 })
 const active = j => !TERMINAL.has(j.status)
 const value = j => j.progress?.total ? j.progress.done / j.progress.total : null
-// состав архива плитками: папка профиля с числом файлов и файлы верхнего уровня
-function tilesOf (j) {
+// состав архива строками: папка и её файлы, файлы корня архива отдельной строкой в конце
+function groupsOf (j) {
   const groups = new Map()
   for (const f of j.result?.files || []) {
-    const top = f.includes('/') ? f.slice(0, f.indexOf('/')) : f
-    groups.set(top, (groups.get(top) || 0) + (f.includes('/') ? 1 : 0))
+    const cut = f.lastIndexOf('/') + 1
+    const dir = f.slice(0, cut)
+    if (!groups.has(dir)) groups.set(dir, [])
+    groups.get(dir).push(f.slice(cut))
   }
-  return [...groups.entries()].map(([name, n]) => ({ name, kind: n ? countText(n, ['файл', 'файла', 'файлов']) : name.split('.').pop().toUpperCase(), folder: n > 0 }))
+  return [...groups.entries()].sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1)).map(([dir, files]) => ({ dir, files }))
 }
 const latest = computed(() => exports.value.find(j => j.status === 'succeeded'))
 watch(() => ws.jobsVersion, () => {})
@@ -70,83 +72,80 @@ onMounted(() => kickJobs())
   <div class="page exp">
     <div class="page__head"><h1 class="page__title">Выгрузка</h1></div>
     <div class="exp__grid">
-      <section class="panel exp__form">
-        <h2>Новая выгрузка</h2>
+      <section class="exp__form" aria-labelledby="exp-new">
+        <h2 id="exp-new">Новая выгрузка</h2>
         <fieldset class="exp__set">
-          <legend class="field__label">Профили</legend>
+          <legend>Профили</legend>
           <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="solar-v1">Солнечные элементы</label>
           <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="rag-v1">RAG-системы</label>
         </fieldset>
         <fieldset class="exp__set">
-          <legend class="field__label">Режим</legend>
-          <label class="exp__mode" :class="{ 'is-on': mode === 'strict' }"><input v-model="mode" type="radio" value="strict"><span><b>Строгая</b><span class="muted">Только принятые статьи и значения с источником</span></span></label>
-          <label class="exp__mode" :class="{ 'is-on': mode === 'incomplete' }"><input v-model="mode" type="radio" value="incomplete"><span><b>С пропусками</b><span class="muted">Всё готовое, пропуски в manifest.json</span></span></label>
+          <legend>Режим</legend>
+          <label class="exp__mode"><input v-model="mode" type="radio" class="rb" value="strict"><span><b>Строгая</b>Только принятые статьи и значения с источником</span></label>
+          <label class="exp__mode"><input v-model="mode" type="radio" class="rb" value="incomplete"><span><b>С пропусками</b>Всё готовое, пропуски перечислены в manifest.json</span></label>
         </fieldset>
-        <details class="exp__more">
-          <summary>Проверки перед сборкой<span class="exp__more-n">{{ [checkSources, checker && profiles.includes('solar-v1')].filter(Boolean).length }} из 2</span></summary>
+        <fieldset class="exp__set">
+          <legend>Перед сборкой</legend>
           <label class="check"><input v-model="checkSources" type="checkbox" class="cb">Сверить источники значений</label>
           <label class="check" :class="{ 'is-off': !profiles.includes('solar-v1') }"><input v-model="checker" type="checkbox" class="cb" :disabled="!profiles.includes('solar-v1')">Внешний checker для solar</label>
-        </details>
-        <button class="btn btn--accent btn--block btn--lg" type="button" :disabled="busy || !editable || !profiles.length" @click="create()"><PackageCheck />Собрать выгрузку</button>
-        <p v-if="!editable" class="field__hint">Собирать выгрузку может редактор корпуса.</p>
+        </fieldset>
+        <button class="btn btn--accent btn--block btn--lg" type="button" :disabled="busy || !editable || !profiles.length" @click="create()">Собрать выгрузку</button>
+        <p v-if="!editable" class="exp__note">Собирать выгрузку может редактор корпуса.</p>
       </section>
 
-      <section class="exp__list">
-        <h2>Выгрузки корпуса</h2>
-        <p v-if="!exports.length" class="muted">Выгрузок пока не было.</p>
-        <article v-for="j in exports" :key="j.id" class="panel exp__job">
-          <header class="exp__jhead">
-            <b>{{ j.target_profiles.map(profileShort).join(' и ') }}</b>
-            <span class="muted">{{ j.options?.allow_incomplete ? 'с пропусками' : 'строгая' }}, {{ fmtDate(j.created_at) }}</span>
-            <span class="grow" />
-            <Chip :tone="JOB_STATUS[j.status]?.tone" :text="JOB_STATUS[j.status]?.text || j.status" />
-          </header>
-          <div v-if="active(j)" class="exp__run">
-            <p class="muted">{{ STAGE[j.stage] || 'В очереди' }}</p>
-            <Progress :value="value(j)" />
-          </div>
-          <template v-else-if="j.status === 'succeeded'">
-            <p class="exp__meta muted"><span class="mono">{{ j.result.file_name }}</span>, {{ fmtBytes(j.result.size_bytes) }}, {{ countText(j.result.documents, ['статья', 'статьи', 'статей']) }} с данными</p>
-            <p v-if="j.result.gaps?.length" class="exp__gaps" :title="j.result.gaps.map(g => `${g.publication_code}: ${g.reason}`).join('\n')">Пропущено {{ countText(j.result.gaps.length, ['статья', 'статьи', 'статей']) }}: {{ j.result.gaps.map(g => g.publication_code).join(', ') }}, причины в manifest.json</p>
-            <ul class="ui-files__grid exp__files">
-              <li v-for="t in tilesOf(j)" :key="t.name" class="ui-file is-done">
-                <span class="ui-file__icon">
-                  <svg v-if="t.folder" class="ui-file__glyph exp__folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v10.5H3z" /></svg>
-                  <svg v-else class="ui-file__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.25 2.75h8L18.75 7.25v14H6.25z" /><path d="M14 2.75v4.75h4.75M9 12.5h6.5M9 15.5h6.5M9 18.5h4" /></svg>
-                </span>
-                <span class="ui-file__name">{{ t.name }}</span>
-                <span class="ui-file__kind">{{ t.kind }}</span>
-                <span class="ui-file__check"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
-              </li>
-            </ul>
-            <div class="exp__actions">
-              <button class="btn btn--primary btn--sm" type="button" @click="download(j)"><Download />Скачать ZIP</button>
-              <button class="btn btn--sm" type="button" @click="show(j, 'passport')"><FileJson />Паспорт данных</button>
-              <button class="btn btn--sm" type="button" @click="show(j, 'report')"><ClipboardList />Отчёт проверки</button>
+      <section class="exp__list" aria-labelledby="exp-list">
+        <h2 id="exp-list">Архивы корпуса</h2>
+        <div v-if="!exports.length" class="empty"><p>Выгрузок пока не было. Настройте состав слева и соберите первый архив.</p></div>
+        <ol v-else class="exp__jobs">
+          <li v-for="j in exports" :key="j.id" class="exp__job">
+            <header class="exp__jhead">
+              <h3>{{ j.target_profiles.map(profileShort).join(' и ') }}<span class="exp__mode-t">, {{ j.options?.allow_incomplete ? 'с пропусками' : 'строгая' }}</span></h3>
+              <span class="exp__date">{{ fmtDate(j.created_at) }}</span>
+              <span class="grow" />
+              <Chip :tone="JOB_STATUS[j.status]?.tone" :text="JOB_STATUS[j.status]?.text || j.status" />
+            </header>
+            <div v-if="active(j)" class="exp__run">
+              <p>{{ STAGE[j.stage] || 'В очереди' }}</p>
+              <Progress :value="value(j)" />
             </div>
-          </template>
-          <template v-else-if="j.status === 'failed'">
-            <p class="exp__err">{{ j.error?.message }}</p>
-            <ul v-if="j.error?.details?.blockers" class="exp__blockers">
-              <li v-for="(b, i) in j.error.details.blockers" :key="i"><b>{{ b.publication_code }}</b>: {{ b.reason }}</li>
-            </ul>
-            <div v-if="editable" class="exp__actions">
-              <button class="btn btn--sm" type="button" @click="router.push(`/corpora/${ws.corpus.id}/checks`)">Открыть проверки</button>
-              <button class="btn btn--sm btn--primary" type="button" :disabled="busy" @click="profiles = j.target_profiles; create({ mode: 'incomplete' })">Собрать с пропусками</button>
-            </div>
-          </template>
-        </article>
+            <template v-else-if="j.status === 'succeeded'">
+              <p class="exp__meta">{{ j.result.file_name }}, {{ fmtBytes(j.result.size_bytes) }}, {{ countText(j.result.documents, ['статья', 'статьи', 'статей']) }} с данными</p>
+              <p v-if="j.result.gaps?.length" class="exp__gaps" :title="j.result.gaps.map(g => `${g.publication_code}: ${g.reason}`).join('\n')">Пропущено {{ countText(j.result.gaps.length, ['статья', 'статьи', 'статей']) }}: {{ j.result.gaps.map(g => g.publication_code).join(', ') }}. Причины в manifest.json</p>
+              <dl class="exp__tree" aria-label="Состав архива">
+                <template v-for="g in groupsOf(j)" :key="g.dir">
+                  <dt>{{ g.dir || 'в корне' }}</dt>
+                  <dd>{{ g.files.join(', ') }}</dd>
+                </template>
+              </dl>
+              <div class="exp__actions">
+                <button class="btn btn--primary btn--sm" type="button" @click="download(j)"><Download />Скачать ZIP</button>
+                <button class="btn btn--ghost btn--sm" type="button" @click="show(j, 'passport')">Паспорт данных</button>
+                <button class="btn btn--ghost btn--sm" type="button" @click="show(j, 'report')">Отчёт проверки</button>
+              </div>
+            </template>
+            <template v-else-if="j.status === 'failed'">
+              <p class="exp__err">{{ j.error?.message }}</p>
+              <ul v-if="j.error?.details?.blockers" class="exp__blockers">
+                <li v-for="(b, i) in j.error.details.blockers" :key="i"><b>{{ b.publication_code }}</b>{{ b.reason }}</li>
+              </ul>
+              <div v-if="editable" class="exp__actions">
+                <button class="btn btn--sm" type="button" @click="router.push(`/corpora/${ws.corpus.id}/checks`)">Открыть проверки</button>
+                <button class="btn btn--ghost btn--sm" type="button" :disabled="busy" @click="profiles = j.target_profiles; create({ mode: 'incomplete' })">Собрать с пропусками</button>
+              </div>
+            </template>
+          </li>
+        </ol>
       </section>
     </div>
 
     <Drawer :open="panel.open" :title="panel.title" width="680px" @close="panel.open = false">
       <template v-if="panel.kind === 'passport'">
         <section v-for="t in tables" :key="t.profile + t.file" class="pass">
-          <h3><span class="mono">{{ t.file }}</span> <span class="faint">{{ profileShort(t.profile) }}, ключ {{ t.id_field }}</span></h3>
+          <h3>{{ t.file }}<span class="pass__sub">{{ profileShort(t.profile) }}, ключ <code>{{ t.id_field }}</code></span></h3>
           <table class="table pass__table">
-            <thead><tr><th>Поле</th><th>Тип</th><th>Единица</th><th>Обяз.</th><th>Ссылка</th></tr></thead>
+            <thead><tr><th>Поле</th><th>Тип</th><th>Единица</th><th>Обязательное</th><th>Ссылка</th></tr></thead>
             <tbody>
-              <tr v-for="f in t.fields" :key="f.name"><td class="mono">{{ f.name }}</td><td>{{ f.type }}<span v-if="f.vocabulary" class="faint" :title="f.vocabulary.join(', ')">, словарь {{ f.vocabulary.length }}</span></td><td>{{ f.unit || '' }}</td><td>{{ f.required ? 'да' : '' }}</td><td class="mono">{{ f.references || '' }}</td></tr>
+              <tr v-for="f in t.fields" :key="f.name"><td><code>{{ f.name }}</code></td><td>{{ f.type }}<span v-if="f.vocabulary" class="muted" :title="f.vocabulary.join(', ')">, словарь {{ f.vocabulary.length }}</span></td><td>{{ f.unit || '' }}</td><td>{{ f.required ? 'да' : '' }}</td><td><code v-if="f.references">{{ f.references }}</code></td></tr>
             </tbody>
           </table>
         </section>
@@ -158,68 +157,56 @@ onMounted(() => kickJobs())
           <dt>По решению</dt><dd>{{ Object.entries(panel.data.by_status || {}).map(([k, v]) => `${k === 'open' ? 'открыто' : k === 'confirmed' ? 'подтверждено' : 'отклонено'} ${v}`).join(', ') || 'нет' }}</dd>
           <dt>Внешний checker</dt><dd>{{ (panel.data.external_checker || []).map(c => `${profileShort(c.profile)}: ${c.status === 'not_run_in_demo' ? 'не запускался в демо' : c.status === 'not_available_for_profile' ? 'для профиля нет' : c.status}`).join('; ') }}</dd>
         </dl>
-        <h3 class="rep__h">Правила</h3>
-        <ul class="rep__rules">
-          <li v-for="r in panel.data.rules" :key="r.profile + r.id"><span>{{ ruleLabel(r.id) === r.id && r.id === 'jsc_limit' ? 'Пределы Jsc, FF и PCE' : ruleLabel(r.id) }}</span><span class="faint">{{ profileShort(r.profile) }}, {{ r.status === 'defined' ? `версия ${r.version}, порог ${r.threshold}` : 'ждёт утверждения, пропущено' }}</span><b class="num">{{ panel.data.by_rule?.[r.id] || '' }}</b></li>
-        </ul>
+        <table class="table rep__rules">
+          <thead><tr><th>Правило</th><th>Профиль и порог</th><th class="t-num">Замечаний</th></tr></thead>
+          <tbody>
+            <tr v-for="r in panel.data.rules" :key="r.profile + r.id"><td>{{ ruleLabel(r.id) === r.id && r.id === 'jsc_limit' ? 'Пределы Jsc, FF и PCE' : ruleLabel(r.id) }}</td><td class="muted">{{ profileShort(r.profile) }}, {{ r.status === 'defined' ? `версия ${r.version}${r.threshold && r.threshold !== '-' ? `, порог ${r.threshold}` : ''}` : 'ждёт утверждения, пропущено' }}</td><td class="t-num">{{ panel.data.by_rule?.[r.id] || '' }}</td></tr>
+          </tbody>
+        </table>
       </template>
     </Drawer>
   </div>
 </template>
 
 <style>
-.exp__grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 24px; align-items: start; }
-.exp h2 { font-size: 13px; line-height: 20px; font-weight: 500; margin-bottom: 12px; }
-.exp__form { padding: 16px; position: sticky; top: calc(var(--header-h) + 20px); }
-.exp__set { border: 0; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.exp__set legend { margin-bottom: 8px; color: var(--u-soft); font-weight: 400; }
-.exp__mode { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--u-line-2); transition: box-shadow 160ms var(--u-ease), background-color 160ms var(--u-ease); }
-.exp__mode:hover { background: var(--u-fill); }
-.exp__mode.is-on { background: var(--u-fill); box-shadow: inset 0 0 0 1.5px var(--u-ink); }
-.exp__mode input { margin-top: 3px; accent-color: var(--u-ink); }
-.exp__mode > span { display: flex; flex-direction: column; gap: 2px; }
-.exp__mode b { font-weight: 500; }
-.exp__mode .muted { font-size: 12px; line-height: 16px; }
-.check.is-off { opacity: .5; }
-.exp__more { margin: -4px 0 16px; }
-.exp__more summary { display: flex; align-items: center; gap: 8px; height: 28px; color: var(--u-muted); list-style: none; }
-.exp__more summary::-webkit-details-marker { display: none; }
-.exp__more summary::after { content: ""; width: 6px; height: 6px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 160ms var(--u-ease); }
-.exp__more[open] summary::after { transform: rotate(225deg) translateY(-1px); }
-.exp__more summary:hover { color: var(--u-ink); }
-.exp__more-n { color: var(--u-soft); }
-.exp__more .check { margin-top: 8px; }
-.exp__list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.exp__list h2 { margin-bottom: 0; }
-.exp__job { padding: 14px 16px 16px; }
-.exp__jhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.exp__jhead b { font-weight: 500; }
-.exp__jhead .muted { color: var(--u-soft); }
-.exp__run { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-.exp__meta { margin-top: 6px; font-size: 12px; line-height: 16px; }
-.exp__gaps { display: flex; gap: 8px; margin-top: 6px; color: var(--u-muted); font-size: 12px; line-height: 16px; }
-.exp__gaps::before { content: ""; width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: var(--ochre); flex: none; }
-.exp__files { margin-top: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 168px)); gap: 8px; }
-.exp__files .ui-file { height: 96px; padding: 12px 8px 0; box-shadow: none; }
-.exp__files .ui-file__icon { width: 32px; height: 32px; margin-bottom: 8px; border-radius: 8px; }
-.exp__files .ui-file__glyph { width: 20px; height: 20px; }
-.exp__files .ui-file__icon .exp__folder { stroke: #4A4A46; }
-.exp__files .ui-file__name { font-size: 12px; }
-.exp__files .ui-file__kind { font-size: 12px; color: var(--u-soft); }
-.exp__files .ui-file__check { top: 6px; right: 6px; width: 16px; height: 16px; }
-.exp__actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
-.exp__err { display: flex; gap: 8px; margin-top: 10px; color: var(--u-ink); }
-.exp__err::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
-.exp__blockers { margin-top: 6px; padding-left: 14px; color: var(--u-text-2); }
-.exp__blockers li { padding: 2px 0; }
-.exp__blockers b { font-weight: 500; }
-.pass { margin-bottom: 22px; }
-.pass h3 { font-size: 13px; margin-bottom: 8px; font-weight: 500; }
-.pass h3 .faint { font-weight: 400; }
-.pass__table td, .pass__table th { height: 32px; font-size: 12px; }
-.rep { margin-bottom: 18px; }
-.rep__h { font-size: 13px; font-weight: 500; margin: 6px 0 8px; }
-.rep__rules li { display: grid; grid-template-columns: 1fr auto 40px; gap: 12px; padding: 8px 0; box-shadow: inset 0 1px 0 var(--u-line); }
-.rep__rules b { text-align: right; font-weight: 500; }
-@media (max-width: 1100px) { .exp__grid { grid-template-columns: 1fr; } .exp__form { position: static; } }
+/* выгрузка: слева состав новой выгрузки без рамки, справа архивы списком с линейками */
+.exp__grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 56px; align-items: start; max-width: 1180px; }
+.exp h2 { font-size: var(--t-17); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; }
+.exp__form { position: sticky; top: 80px; }
+.exp__set { border: 0; margin: 0 0 22px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.exp__set legend { margin-bottom: 10px; color: var(--pencil); }
+.exp__mode { display: flex; gap: 10px; cursor: pointer; }
+.exp__mode .rb { margin-top: 2px; }
+.exp__mode > span { display: flex; flex-direction: column; color: var(--pencil); font-size: 13px; line-height: 18px; }
+.exp__mode b { font-size: var(--t-14); line-height: 20px; font-weight: 600; color: var(--ink); }
+.check.is-off { color: var(--pencil); }
+.exp__note { margin-top: 10px; font-size: 13px; line-height: 18px; color: var(--pencil); }
+.exp__list { min-width: 0; }
+.exp__list .empty { padding-top: 0; }
+.exp__jobs { box-shadow: inset 0 1.5px 0 var(--rule-strong); }
+.exp__job { padding: 18px 0 20px; }
+.exp__job + .exp__job { box-shadow: inset 0 1px 0 var(--rule); }
+.exp__jhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.exp__jhead h3 { font-size: var(--t-14); line-height: 20px; font-weight: 600; }
+.exp__mode-t { font-weight: 400; color: var(--pencil); }
+.exp__date { color: var(--pencil); }
+.exp__run { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; max-width: 420px; color: var(--pencil); }
+.exp__meta { margin-top: 4px; color: var(--pencil); }
+.exp__gaps { margin-top: 2px; color: var(--warn); }
+.exp__tree { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 20px; margin-top: 14px; font-size: 13px; line-height: 18px; }
+.exp__tree dt { font-weight: 600; }
+.exp__tree dd { color: var(--pencil); max-width: 72ch; }
+.exp__actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
+.exp__err { margin-top: 8px; max-width: 72ch; }
+.exp__blockers { margin-top: 8px; font-size: 13px; line-height: 18px; color: var(--pencil); }
+.exp__blockers li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; padding: 3px 0; }
+.exp__blockers b { font-weight: 600; color: var(--ink); }
+.pass { margin-bottom: 28px; }
+.pass h3 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: var(--t-14); line-height: 20px; font-weight: 600; margin-bottom: 8px; }
+.pass__sub { font-weight: 400; color: var(--pencil); }
+.pass__table td, .pass__table th { height: 34px; font-size: 13px; }
+.exp code, .drawer code { font-family: var(--mono); font-size: 12.5px; }
+.rep { margin-bottom: 24px; }
+.rep__rules td { height: 40px; }
+@media (max-width: 1100px) { .exp__grid { grid-template-columns: 1fr; gap: 32px; } .exp__form { position: static; max-width: 420px; } }
 </style>

@@ -1,8 +1,8 @@
 <!-- Назначение файла: полоса текущей обработки над списком документов: сколько готово, что идёт сейчас,
-     ожидание решения по теме. Опрос заданий ведёт stores/workspace.js. -->
+     ожидание решения по теме, пауза и продолжение. Опрос заданий ведёт stores/workspace.js. -->
 <script setup>
 import { computed, ref } from 'vue'
-import { X, Pause, Play } from '@lucide/vue'
+import { X } from '@lucide/vue'
 import Progress from '../ui/Progress.vue'
 import JobDrawer from './JobDrawer.vue'
 import ClassificationDialog from './ClassificationDialog.vue'
@@ -42,6 +42,8 @@ const value = computed(() => c.value.total ? doneCount.value / c.value.total : n
 const waiting = computed(() => job.value?.status === 'waiting_review')
 const waitingDoc = computed(() => props.waitingDocs[0] || null)
 const finished = computed(() => job.value && TERMINAL.has(job.value.status))
+const paused = computed(() => job.value?.status === 'paused')
+const pausable = computed(() => canEdit(ws.corpus) && ['queued', 'running', 'waiting_review', 'paused'].includes(job.value?.status))
 const summary = computed(() => {
   const parts = []
   if (c.value.succeeded) parts.push(`готово ${c.value.succeeded}`)
@@ -55,39 +57,36 @@ const summary = computed(() => {
 
 <template>
   <div v-if="job" class="jbanner" :class="{ 'jbanner--wait': waiting }">
-    <span class="jbanner__mark" :class="job.status === 'paused' ? 'is-paused' : waiting ? 'is-wait' : finished ? 'is-done' : 'is-run'" aria-hidden="true" />
+    <span v-if="!waiting && !finished && !paused" class="jbanner__spin" aria-hidden="true" />
     <p class="jbanner__title">
-      <template v-if="job.status === 'paused'">Обработка приостановлена</template>
-      <template v-else-if="job.status === 'pause_requested'">Приостанавливается после текущего этапа…</template>
+      <template v-if="paused">Обработка приостановлена<span v-if="!ui.mobile" class="jbanner__sub">готово {{ doneCount }} из {{ c.total || 0 }}, прогресс сохранён</span></template>
+      <template v-else-if="job.status === 'pause_requested'">Приостанавливается после текущего этапа</template>
       <template v-else-if="waiting">{{ JOB_KIND[job.kind] }} ждёт решения по теме{{ waitingDoc ? ` ${waitingDoc.publication_code}` : '' }}</template>
       <template v-else-if="finished">{{ JOB_KIND[job.kind] }} завершена</template>
       <template v-else>{{ JOB_KIND[job.kind] }}: {{ doneCount }} из {{ countText(c.total || 0, ['статьи', 'статей', 'статей']) }}</template>
-      <span v-if="!waiting && !ui.mobile" class="jbanner__sub"><template v-if="!finished && job.stage_document">{{ job.stage_document }}, {{ (STAGE[job.stage] || job.stage).toLowerCase() }}</template><template v-else-if="finished">{{ summary }}</template></span>
+      <span v-if="!waiting && !paused && !ui.mobile" class="jbanner__sub"><template v-if="!finished && job.stage_document">{{ job.stage_document }}, {{ (STAGE[job.stage] || job.stage).toLowerCase() }}</template><template v-else-if="finished">{{ summary }}</template></span>
     </p>
     <span class="grow" />
-    <button v-if="canEdit(ws.corpus) && ['queued', 'running', 'waiting_review', 'paused'].includes(job.status)" class="btn btn--sm" type="button" :disabled="busy" @click="changePause"><Play v-if="job.status === 'paused'" /><Pause v-else />{{ job.status === 'paused' ? 'Продолжить' : 'Приостановить' }}</button>
+    <button v-if="pausable" class="btn btn--sm" :class="{ 'btn--primary': paused }" type="button" :disabled="busy" @click="changePause">{{ paused ? 'Продолжить' : 'Приостановить' }}</button>
     <button v-if="waiting && waitingDoc && canEdit(ws.corpus)" class="btn btn--primary btn--sm" type="button" @click="decide = waitingDoc">Решить тему</button>
     <button class="btn btn--ghost btn--sm" type="button" @click="drawer = job.id">Подробнее</button>
     <button v-if="finished" class="btn btn--ghost btn--icon btn--sm" type="button" aria-label="Скрыть" @click="dismissed.add(job.id)"><X /></button>
-    <Progress v-if="!finished && !waiting && job.status !== 'paused'" :value="value" class="jbanner__bar" />
+    <Progress v-if="!finished && !waiting && !paused" :value="value" class="jbanner__bar" />
     <JobDrawer :open="!!drawer" :job-id="drawer" @close="drawer = null" />
     <ClassificationDialog :open="!!decide" :document-id="decide?.id" :code="decide?.publication_code" @close="decide = null" @done="emit('changed')" />
   </div>
 </template>
 
 <style>
-/* полоса задания в одну строку: что идёт и одно действие; прогресс тонкой линией по нижнему краю */
-.jbanner { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 12px; padding: 6px 8px 6px 14px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; overflow: hidden; }
-.jbanner__mark { width: 14px; height: 14px; flex: none; border-radius: 50%; }
-.jbanner__mark.is-run { border: 2px solid color-mix(in oklab, var(--u-accent) 30%, transparent); border-top-color: var(--u-accent); animation: ui-spin 800ms linear infinite; }
-.jbanner__mark.is-wait { width: 8px; height: 8px; margin: 0 3px; background: var(--u-ink); }
-.jbanner__mark.is-done { width: 8px; height: 8px; margin: 0 3px; background: var(--u-accent); }
-.jbanner__mark.is-paused { width: 10px; height: 12px; margin: 0 2px; border-radius: 0; border-left: 3px solid var(--u-muted); border-right: 3px solid var(--u-muted); }
-.jbanner__title { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jbanner__sub { margin-left: 10px; font-weight: 400; color: var(--u-muted); }
-.jbanner__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 0; background: transparent; }
+/* строка задания над таблицей: что идёт и одно действие, без рамки; прогресс тонкой линией снизу */
+.jbanner { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; margin: -4px 0 16px; padding: 4px 0 6px; }
+.jbanner__spin { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid color-mix(in oklab, var(--source) 28%, transparent); border-top-color: var(--source); animation: ui-spin 800ms linear infinite; }
+.jbanner__title { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jbanner--wait .jbanner__title { color: var(--ink); }
+.jbanner__sub { margin-left: 10px; font-weight: 400; color: var(--pencil); }
+.jbanner__bar { position: absolute; left: 0; right: 0; bottom: 0; }
 @media (max-width: 719px) {
-  .jbanner { flex-wrap: wrap; padding: 10px 12px; }
+  .jbanner { flex-wrap: wrap; }
   .jbanner__title { flex: 1 1 calc(100% - 30px); white-space: normal; }
   .jbanner .grow { display: none; }
   .jbanner .btn { flex: 1; }
