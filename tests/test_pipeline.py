@@ -237,3 +237,18 @@ def test_archiving_cancels_pending_runs_before_any_activation(env,corpus):
     with Uow() as u:
         assert u.repo.get('jobs',job['id'])['status']=='cancelled'
         assert not u.repo.get('publications',corpus.pub['id'])['current']
+
+
+def test_archive_between_classification_response_and_commit_does_not_publish(env,corpus):
+    job,items=enqueue(env,corpus)
+    class ArchiveBeforeCommit(Runner):
+        def model_call(self,item_id,token,progress,key,*args):
+            result=super().model_call(item_id,token,progress,key,*args)
+            if key=='classify-final':
+                env.rt.documents.patch_corpus(env.actors['editor'],corpus.corpus['id'],{'archived':True})
+            return result
+    ArchiveBeforeCommit(Uow,env.storage,ModelDouble(),env.config).run(items[0]['id'])
+    with Uow() as u:
+        assert u.repo.get('jobs',job['id'])['status']=='cancelled'
+        assert u.repo.get('documents',corpus.doc['id'])['classification_id'] is None
+        assert not u.repo.find('classification_revisions',document_id=corpus.doc['id'])

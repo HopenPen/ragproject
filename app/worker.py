@@ -1,8 +1,10 @@
 # Назначение файла: Celery work/DLQ, transactional outbox dispatcher и lease recovery.
 import logging
 import threading
+import time
 from datetime import timedelta, timezone
 from celery import Celery
+from celery.signals import setup_logging
 from kombu import Exchange, Queue
 from sqlalchemy import select, or_
 from app.config import settings
@@ -24,6 +26,16 @@ celery.conf.update(task_serializer='json', result_serializer='json', accept_cont
 log = logging.getLogger(__name__)
 
 
+@setup_logging.connect
+def configure_worker_logging(**kwargs):
+    from app.main import JsonLog
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonLog())
+    root = logging.getLogger()
+    root.handlers[:] = [handler]
+    root.setLevel(config.log_level)
+
+
 class Publisher:
     def publish(self, item_id, task_id):
         execute.apply_async(args=[item_id], task_id=task_id, queue='work', retry=False)
@@ -40,6 +52,7 @@ def execute(self, item_id):
     from app.storage import Storage
     from app.provider import ResponsesModel
     runner = Runner(Uow, Storage(config), ResponsesModel(config), config)
+    started = time.monotonic()
     try:
         runner.run(item_id)
     except TransientError as exc:
@@ -54,6 +67,14 @@ def execute(self, item_id):
     except Exception as exc:
         schedule_dead_letter(item_id, type(exc).__name__)
         log.error('job_failed', extra={'item_id': item_id, 'error_code': type(exc).__name__})
+    finally:
+        fields = {'item_id': item_id, 'elapsed_ms': round(1000*(time.monotonic()-started))}
+        try:
+            item, job = runner.load(item_id)
+            fields.update(job_id=job['id'], corpus_id=job['corpus_id'], status=item['status'])
+        except Exception:
+            fields['status'] = 'unknown'
+        log.info('job_item_finished', extra=fields)
 
 
 def schedule_dead_letter(item_id, code):

@@ -1,7 +1,8 @@
 # Назначение файла: общий image auth/backend/worker/init с OCR eng/rus.
 FROM golang:1.24.8-alpine3.22 AS minio-build
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOMAXPROCS=2
-RUN apk add --no-cache git ca-certificates && git clone --depth 1 --branch RELEASE.2025-10-15T17-29-55Z https://github.com/minio/minio.git /src/minio && cd /src/minio && test "$(git rev-parse HEAD)" = 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a && go build -p 2 -trimpath -ldflags='-s -w' -o /go/bin/minio . && cp LICENSE /go/bin/LICENSE.minio && go clean -modcache -cache && cd / && rm -rf /src/minio
+RUN apk --timeout 30 add --no-cache git ca-certificates
+RUN git clone --depth 1 --branch RELEASE.2025-10-15T17-29-55Z https://github.com/minio/minio.git /src/minio && cd /src/minio && test "$(git rev-parse HEAD)" = 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a && go build -p 2 -trimpath -ldflags='-s -w' -o /go/bin/minio . && cp LICENSE /go/bin/LICENSE.minio && go clean -modcache -cache && cd / && rm -rf /src/minio
 
 FROM alpine:3.22.2 AS minio
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 minio && mkdir /data && chown minio /data
@@ -12,7 +13,7 @@ USER minio
 ENTRYPOINT ["/usr/local/bin/minio"]
 
 FROM python:3.12.10-slim-bookworm AS app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONPATH=/app
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-rus postgresql-client ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .

@@ -71,6 +71,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       minio: {condition: service_started}
+      rabbitmq: {condition: service_healthy}
     volumes:
       - keys:/keys
       - public-keys:/public-keys
@@ -118,13 +119,24 @@ services:
     depends_on:
       auth: {condition: service_healthy}
       backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/__health]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   nginx:
     image: nginx:1.28.0-alpine
     volumes: ['./infra/nginx.conf:/etc/nginx/nginx.conf:ro']
     ports: ['${INGRESS_HOST:-0.0.0.0}:${INGRESS_PORT:-80}:80']
     networks: [private]
     restart: unless-stopped
-    depends_on: [krakend]
+    depends_on:
+      krakend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1/health/live]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 networks:
   private: {}
 volumes:

@@ -77,6 +77,21 @@ def bootstrap(path):
     path.chmod(0o600)
 
 
+def initialize_broker(config):
+    from kombu import Connection, Exchange, Queue
+    definitions = json.loads(Path('infra/rabbitmq.json').read_text())
+    with Connection(config.rabbitmq_url.get_secret_value(), connect_timeout=5,
+                    transport_options={'confirm_publish': True}) as connection:
+        for value in definitions['exchanges']:
+            Exchange(value['name'], type=value['type'], durable=value['durable'],
+                     auto_delete=value['auto_delete'])(connection).declare()
+        for value in definitions['queues']:
+            Queue(value['name'], durable=value['durable'], auto_delete=value['auto_delete'],
+                  queue_arguments=value['arguments'])(connection).declare()
+        for value in definitions['bindings']:
+            Queue(value['destination'])(connection).bind_to(value['source'], value['routing_key'], value['arguments'])
+
+
 def initialize(config):
     from alembic.config import Config
     from alembic import command
@@ -102,6 +117,7 @@ def initialize(config):
             if attempt == 19:
                 raise
             time.sleep(2)
+    initialize_broker(config)
     render_gateway(config, Path('/gateway/krakend.json'))
 
 

@@ -66,6 +66,20 @@ def run(base_url, output, technical_only=False):
         other=request('POST','/api/v1/corpora',expected=(201,),headers={'Authorization':'Bearer '+editor['access_token']},json={'name':'SYNTHETIC other owner '+suffix}).json()
         request('GET','/api/v1/corpora/'+other['id'],headers={'Authorization':'Bearer '+editor['access_token']})
         request('GET','/api/v1/corpora/'+cid,expected=(404,),headers={'Authorization':'Bearer '+editor['access_token']})
+        def enqueue(kind, profiles=None, key=None):
+            payload={'kind':kind,'all_documents':True}
+            if kind in ('validate','export'):payload['run_external_checker']=False
+            if profiles: payload['target_profiles']=profiles
+            return request('POST',f'/api/v1/corpora/{cid}/jobs',expected=(202,),headers={'Idempotency-Key':key or secrets.token_hex(12)},json=payload).json()
+        def wait(job, expected=('succeeded',)):
+            deadline=time.monotonic()+120
+            while time.monotonic()<deadline:
+                value=request('GET',job['status_url']).json()
+                if value['status'] in ('succeeded','failed','blocked_external_configuration','cancelled','partially_succeeded'):
+                    assert value['status'] in expected, f'Job ended as {value["status"]}'
+                    return value
+                time.sleep(.5)
+            raise AssertionError('Timed out waiting for worker/outbox')
         active_scenario=5
         from tests.fixtures import pdf_bytes, classification, solar_graph, rag_graph
         blob=pdf_bytes('mixed')
@@ -76,6 +90,19 @@ def run(base_url, output, technical_only=False):
         request('POST',f'/api/v1/corpora/{cid}/documents',expected=(415,),data={'publication_code':'BAD'},files={'file':('bad.pdf',b'not PDF','application/pdf')})
         assert hashlib.sha256(request('GET',f'/api/v1/documents/{did}/file').content).hexdigest()==doc['sha256']
         record(5,['Multipart/original PDF binary roundtrip, dedup, code/hash conflict and invalid PDF rejection passed'], 'blocked', 'Oversized PDF rejection still requires the configured ingress byte-limit check')
+        if not config.openai_api_key.get_secret_value():
+            active_scenario=6
+            for kind in ('process','classify'):
+                job=enqueue(kind); wait(job,('blocked_external_configuration',))
+                item=request('GET',f'/api/v1/jobs/{job["job_id"]}/items').json()['items'][0]
+                assert item['progress']['coverage']['complete'] and not item['progress'].get('outputs')
+            record(6,['Actual process/classify enqueue, polling and page progress; both jobs correctly blocked by absent API key'])
+            active_scenario=10
+            assert request('GET',f'/api/v1/documents/{did}/pages/1/image').content.startswith(b'\x89PNG\r\n\x1a\n')
+            assert request('GET',f'/api/v1/documents/{did}/pages/1/text').json()['text']
+            crops=request('GET',f'/api/v1/documents/{did}/artifacts?kind=crop').json()['items']
+            assert crops and request('GET',f'/api/v1/documents/{did}/artifacts/{crops[0]["id"]}/file').content.startswith(b'\x89PNG')
+            record(10,['Actual rendered PNG, page text and embedded-image crop retrieved through S3/gateway'], 'blocked', 'Human visual/source confirmation is required')
         active_scenario=8
         decision=classification(['solar','rag'])
         cls=request('POST',f'/api/v1/documents/{did}/classifications/review',json={'expected_revision':'none','decision':decision,'reason':'SYNTHETIC smoke control'}).json()
@@ -101,20 +128,6 @@ def run(base_url, output, technical_only=False):
         request('GET',f'/api/v1/corpora/{cid}/search?q=SYNTHETIC&scope=metadata')
         request('POST',f'/api/v1/corpora/{cid}/comparisons',json={'profile':'rag-v1','results':[{'publication_id':pid,'result_id':'R1'}]})
         record(13,['Profile result filters, metadata search and RAG comparability handler responded'], 'blocked', 'Page-text search and both profile comparison policies still need acceptance confirmation')
-        def enqueue(kind, profiles=None, key=None):
-            payload={'kind':kind,'all_documents':True}
-            if kind in ('validate','export'):payload['run_external_checker']=False
-            if profiles: payload['target_profiles']=profiles
-            return request('POST',f'/api/v1/corpora/{cid}/jobs',expected=(202,),headers={'Idempotency-Key':key or secrets.token_hex(12)},json=payload).json()
-        def wait(job):
-            deadline=time.monotonic()+120
-            while time.monotonic()<deadline:
-                value=request('GET',job['status_url']).json()
-                if value['status'] in ('succeeded','failed','blocked_external_configuration','cancelled','partially_succeeded'):
-                    assert value['status']=='succeeded', f'Job ended as {value["status"]}'
-                    return value
-                time.sleep(.5)
-            raise AssertionError('Timed out waiting for worker/outbox')
         active_scenario=16
         archives=[]
         for profiles in (['solar-v1'],['rag-v1'],['solar-v1','rag-v1']):

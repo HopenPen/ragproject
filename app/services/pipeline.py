@@ -173,8 +173,9 @@ class Jobs:
             u.repo.add('audit_entries', corpus_id=doc['corpus_id'], document_id=doc_id, publication_id=pub['id'],
                        author_id=actor['id'], action='classification_review', reason=reason, details={'revision_id': cls['id']})
             for item in u.repo.find('job_items', document_id=doc_id, status='waiting_review'):
-                job = u.repo.get('jobs', item['job_id'])
-                if job['status'] == 'cancel_requested':
+                job = u.repo.get('jobs', item['job_id'], lock=True)
+                item = u.repo.get('job_items', item['id'], lock=True)
+                if job['status'] == 'cancel_requested' or item['status'] != 'waiting_review':
                     continue
                 u.repo.update('job_items', item['id'], status='queued', stage='extract')
                 out = u.repo.find('outbox', item_id=item['id'])[0]
@@ -313,6 +314,10 @@ class Runner:
                 decision['outcome'] = 'needs_review'
             with self.uow() as u:
                 u.repo.get('corpora', doc['corpus_id'], lock=True)
+                latest_job = u.repo.get('jobs', job['id'], lock=True)
+                latest_item = u.repo.get('job_items', item['id'], lock=True)
+                if latest_item['lease_token'] != token or latest_job['status'] == 'cancel_requested':
+                    raise Cancelled()
                 existing = u.repo.find('classification_revisions', document_id=doc_id, run_id=item['id'])
                 if existing:
                     cls = existing[0]
