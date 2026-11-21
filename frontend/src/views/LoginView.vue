@@ -66,7 +66,12 @@ function demoLogin (who) {
       <figure class="login__sheet">
         <img :src="cropUrl" alt="" width="1612" height="450">
         <span class="login__paper" />
-        <span class="login__pin"><span>PCE 21,4 %</span></span>
+        <svg class="login__annotation" viewBox="0 0 1612 450" aria-hidden="true">
+          <rect x="1378" y="282" width="88" height="52" rx="5" fill="#07854A" fill-opacity=".1" stroke="#07854A" stroke-width="4" />
+          <path d="M1422 334v28" stroke="#07854A" stroke-width="3" />
+          <rect x="1260" y="362" width="284" height="56" rx="6" fill="#07854A" />
+          <text x="1280" y="400" fill="white" font-size="30" font-weight="500" font-family="Geologica, sans-serif">PCE 21,4 %</text>
+        </svg>
       </figure>
       <p class="login__caption">Каждое значение в базе ведёт к своему месту в статье: странице, таблице и строке.</p>
     </section>
@@ -87,8 +92,7 @@ function demoLogin (who) {
 .login__sheet { position: relative; margin: 0; width: min(100%, 860px); background: #fff; box-shadow: var(--shadow-page); border-radius: 3px; }
 .login__sheet img { width: 100%; height: auto; border-radius: 3px; }
 .login__paper { position: absolute; inset: 0; background: var(--paper); mix-blend-mode: multiply; border-radius: 3px; }
-.login__pin { position: absolute; left: 81.24%; top: 50.91%; width: 3.82%; height: 8.29%; border-radius: 3px; box-shadow: 0 0 0 2.5px #07854A, 0 0 0 7px rgba(7, 133, 74, .16); background: rgba(7, 133, 74, .1); transform: scale(1.15); }
-.login__pin span { position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); padding: 3px 8px; border-radius: 4px; background: #07854A; color: #fff; font: 500 13px/1.25 var(--font); white-space: nowrap; }
+.login__annotation { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .login__caption { max-width: 46ch; color: var(--muted); font-size: var(--fs-lg); line-height: 1.5; }
 @media (max-width: 900px) {
   .login { grid-template-columns: 1fr; }

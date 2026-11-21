@@ -10,6 +10,6 @@ class FrontendFiles(StaticFiles):
         try:
             return await super().get_response(path, scope)
         except HTTPException as exc:
-            if exc.status_code != 404 or PurePosixPath(path).suffix or path.startswith(('assets/', 'pdfjs/')):
+            if exc.status_code != 404 or PurePosixPath(path).suffix or any(part.startswith('.') for part in PurePosixPath(path).parts) or path.startswith(('assets/', 'pdfjs/')):
                 raise
             return await super().get_response('index.html', scope)

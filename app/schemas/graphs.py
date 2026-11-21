@@ -26,7 +26,7 @@ class Scope(Strict):
 class Evidence(Strict):
     evidence_id: Identifier
     entity_id: str | None = None
-    field_path: str
+    field_path: str = Field(description='Exact field on the entity identified by entity_id, e.g. metric_value or top_k. With entity_id=null, use bibliography.title or scope.in_scope. Never a collection name alone.')
     source_page: PositivePage
     section: str | None = None
     table: str | None = None

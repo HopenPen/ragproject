@@ -230,6 +230,22 @@ def test_model_cannot_confirm_its_own_sources():
     with pytest.raises(Error):machine_evidence(graph)
 
 
+def test_strict_schema_preserves_metadata_named_scientific_fields():
+    schema = strict_schema({'type': 'object', 'title': 'Schema title', 'properties': {
+        'title': {'type': 'string', 'title': 'Article title'},
+        'format': {'type': 'string', 'default': 'example'},
+        'default': {'type': 'boolean'},
+    }})
+    assert set(schema['properties']) == {'title', 'format', 'default'}
+    assert set(schema['required']) == set(schema['properties'])
+    assert 'title' not in schema
+    assert 'title' not in schema['properties']['title']
+    from app.schemas.graphs import Classification
+    bibliography = strict_schema(Classification.model_json_schema())['$defs']['Bibliography']
+    assert 'title' in bibliography['properties']
+    assert set(bibliography['required']) == set(bibliography['properties'])
+
+
 def test_archiving_cancels_pending_runs_before_any_activation(env,corpus):
     job,items=enqueue(env,corpus)
     env.rt.documents.patch_corpus(env.actors['editor'],corpus.corpus['id'],{'archived':True})
