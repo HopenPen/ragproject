@@ -108,6 +108,7 @@ services:
   krakend:
     image: devopsfaith/krakend:2.9.3
     user: '10001:10001'
+    entrypoint: [/usr/bin/krakend]
     command: [run, -c, /etc/krakend/krakend.json]
     volumes:
       - gateway:/etc/krakend:ro

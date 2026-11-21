@@ -45,6 +45,8 @@ def render_gateway(config, output):
                     elif backend == 'backend' and method != 'GET' and not route.path.endswith('/comparisons'):
                         roles = ['editor', 'admin']
                     entry['extra_config'] = {'auth/validator': {'alg': 'RS256', 'jwk_local_path': '/public-keys/jwks.json',
+                        # KrakenD 2.9 requires this flag for a mounted local JWK too; no HTTP key URL is configured.
+                        'disable_jwk_security': True,
                         'issuer': config.jwt_issuer, 'audience': [config.jwt_audience], 'roles_key': 'roles', 'roles': roles,
                         'cache': False, 'propagate_claims': [['sub', 'X-User-ID'], ['role', 'X-User-Role']]}}
                 endpoints.append(entry)

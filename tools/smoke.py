@@ -39,7 +39,7 @@ def run(base_url, output, technical_only=False):
     try:
         request('GET','/health/live'); request('GET','/docs'); schema=request('GET','/openapi.json').json()
         assert '/api/v1/corpora/{id}/jobs' in schema['paths']
-        record(1, ['Ingress /docs and OpenAPI available; technical dependencies further exercised by login/upload/export'])
+        record(1, ['Ingress /docs and OpenAPI available'], 'blocked', 'Dependency roundtrips have not completed yet')
         active_scenario=2
         request('GET','/api/v1/corpora',expected=(401,403))
         request('GET','/api/v1/corpora',expected=(401,403),headers={'Authorization':'Bearer invalid','X-User-ID':'spoof','X-User-Role':'admin','X-Gateway-Credential':'spoof'})
@@ -128,6 +128,7 @@ def run(base_url, output, technical_only=False):
         request('PUT',path,headers={'If-Match':latest.headers['etag']},json={'graph':graph,'reason':'snapshot immutability check'})
         assert request('GET',f'/api/v1/jobs/{archives[-1][0]["job_id"]}/download').content==archives[-1][1]
         record(16,['Real worker/S3 ZIP solar, RAG and mixed; 7 CSV/profile, original ZIP unchanged after revision'])
+        record(1,['Ingress/docs, login through Redis/PostgreSQL, PDF/S3 roundtrip and RabbitMQ/Celery export jobs completed'])
         active_scenario=14
         validation=enqueue('validate'); wait(validation)
         report=request('GET',f'/api/v1/jobs/{validation["job_id"]}/report').json()
