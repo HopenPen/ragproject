@@ -1,11 +1,25 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeGraph, normalizeClassification, normalizeIssue, decodeRecord } from '../src/api/adapters.js'
+import { normalizeGraph, normalizeClassification, normalizeIssue, normalizeDocument, decodeRecord } from '../src/api/adapters.js'
 import { metricParts, fmtResult } from '../src/lib/format.js'
 import { http, setTokens, clearTokens } from '../src/api/http.js'
 import { publications, catalog } from '../src/api/index.js'
 
 globalThis.window = { location: { origin: 'http://localhost' } }
+
+test('an old model access failure does not hide the accepted scientific graph', () => {
+  const doc = { id: 'D1' }
+  const ctx = { pubs: [{ id: 'P1', document_id: 'D1', current: { 'solar-v1': 'accepted' } }], issues: [] }
+  const blocked = { job_id: 'J1', status: 'blocked_external_configuration', error: 'OPENAI_API_KEY is not configured', progress: {} }
+  assert.equal(normalizeDocument(doc, ctx, null, blocked).status, 'ready')
+  assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'failed' }).status, 'ready')
+  assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'running' }).status, 'processing')
+  assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'queued' }).status, 'queued')
+  const pending = normalizeDocument(doc, { pubs: [], issues: [] }, null, blocked)
+  assert.equal(pending.status, 'blocked')
+  assert.match(pending.status_hint, /При запуске задания/)
+  assert.equal(pending.processing.job_id, 'J1')
+})
 
 test('server graphs retain source coordinates, nulls, precision and Recall@0', () => {
   const graph = normalizeGraph({ revision_id: 'revision-1', graph: { domain_profile: 'rag-v1', bibliography: {}, results: [{ result_id: 'R1', metric_name: 'Recall', metric_k: 0, metric_value: '0.7000', metric_unit: 'fraction', normalized_value: null }], evidence: [{ evidence_id: 'E1', entity_id: 'R1', source_page: 7, bbox: ['10.5', '20', '90', '30'], fragment: 'Recall@0 = 0.7000', review: 'open' }] } })

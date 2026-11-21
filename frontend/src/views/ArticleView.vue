@@ -54,7 +54,7 @@ async function load () {
     doc.value = await documents.get(props.documentId)
     pub.value = doc.value.publication_id ? await publications.get(doc.value.publication_id) : null
     const profiles = pub.value ? Object.keys(pub.value.profiles) : []
-    profile.value = profiles.includes(route.query.profile) ? route.query.profile : profiles[0] || null
+    profile.value = profiles.includes(route.query.profile) ? route.query.profile : profiles.find(p => pub.value.profiles[p].in_scope === true) || profiles[0] || null
     await Promise.all([loadGraph(), loadIssues()])
     applyQuery()
   } catch (e) {
@@ -301,9 +301,9 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
           </template>
           <template v-else-if="state === 'blocked'">
             <CircleAlert class="art__icon art__icon--warn" />
-            <h2>Модель не подключена</h2>
-            <p>{{ doc.processing?.error?.message }}.</p>
-            <p class="muted">Файл и текст страниц проверены. Записи появятся после подключения модели на сервере.</p>
+            <h2>Нужен повтор обработки</h2>
+            <p>{{ doc.processing?.error?.message }}</p>
+            <p class="muted">Это результат предыдущей попытки. Повторите задание на странице документов.</p>
           </template>
           <template v-else>
             <Hourglass class="art__icon" />

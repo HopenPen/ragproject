@@ -21,16 +21,24 @@ export function normalizeIssue(i, ctx = {}) {
 export function normalizeDocument(doc, ctx, classification, item) {
   const pub = ctx.pubs.find(p => p.document_id === doc.id)
   const cls = normalizeClassification(classification)
-  let status = cls?.outcome === 'outside' ? 'outside' : cls?.outcome === 'unreadable' ? 'unreadable' : cls?.outcome === 'needs_review' ? 'needs_review' : Object.keys(pub?.current || {}).length ? 'ready' : 'uploaded'
+  const hasActiveGraph = Object.keys(pub?.current || {}).length > 0
+  let status = cls?.outcome === 'outside' ? 'outside' : cls?.outcome === 'unreadable' ? 'unreadable' : cls?.outcome === 'needs_review' ? 'needs_review' : hasActiveGraph ? 'ready' : 'uploaded'
   if (cls?.outcome === 'resolved' && cls.labels.length && cls.labels.every(l => cls[l]?.in_scope === false)) status = 'excluded'
   if (item) {
     if (item.status === 'running') status = 'processing'
     else if (item.status === 'queued') status = 'queued'
     else if (item.status === 'waiting_review') status = 'needs_review'
-    else if (item.status === 'failed') status = 'failed'
-    else if (item.status === 'blocked_external_configuration') status = 'blocked'
+    else if (item.status === 'failed' && !hasActiveGraph) status = 'failed'
+    else if (item.status === 'blocked_external_configuration' && !hasActiveGraph) status = 'blocked'
   }
-  return { ...doc, size_bytes: doc.byte_size, title: cls?.bibliography?.title || doc.display_name, publication_id: pub?.id, classification: cls, status, issues_open: ctx.issues.filter(i => i.publication_id === pub?.id && i.review === 'open' && pub?.current[i.profile] === i.revision_id).length, processing: item ? { ...item, progress: { ...item.progress, done: item.progress.done ?? item.progress.pages_done } } : null }
+  return { ...doc, size_bytes: doc.byte_size, title: cls?.bibliography?.title || doc.display_name, publication_id: pub?.id, classification: cls, status, status_hint: status === 'blocked' ? processingErrorMessage(item.error) : null, issues_open: ctx.issues.filter(i => i.publication_id === pub?.id && i.review === 'open' && pub?.current[i.profile] === i.revision_id).length, processing: item ? { ...item, error: item.error ? { message: processingErrorMessage(item.error) } : null, progress: { ...item.progress, done: item.progress?.done ?? item.progress?.pages_done } } : null }
+}
+export function processingErrorMessage(error) {
+  if (/OPENAI_API_KEY is not configured/.test(error || '')) return 'При запуске задания API-ключ ещё не был настроен. Повторите обработку.'
+  if (/access unavailable|HTTP (401|403|404)/.test(error || '')) return 'В этой попытке сервис модели отказал в доступе. Проверьте ключ и повторите обработку.'
+  if (error === 'invalid_candidate') return 'Извлечённые данные не прошли проверку связей. Повторите обработку.'
+  if (error === 'provider_rejected') return 'Сервис модели отклонил запрос. Повторите обработку после исправления настроек.'
+  return 'Предыдущая попытка обработки остановлена. Подробности доступны в задании.'
 }
 export function normalizeJob(job, items = []) {
   const counters = { ...(job.counters || {}) }

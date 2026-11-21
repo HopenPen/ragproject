@@ -24,6 +24,18 @@ const filter = ref('all')
 const selected = ref(new Set())
 const uploadOpen = ref(false)
 const editable = computed(() => canEdit(ws.corpus))
+const retrying = ref(new Set())
+
+async function retryBlocked (doc) {
+  if (!doc.processing?.job_id || retrying.value.has(doc.id)) return
+  retrying.value.add(doc.id)
+  try {
+    await jobs.retry(doc.processing.job_id)
+    notify.ok('Повтор обработки запущен')
+    kickJobs()
+    await load()
+  } catch (e) { notify.error(e) } finally { retrying.value.delete(doc.id) }
+}
 
 async function load () {
   try {
@@ -116,6 +128,7 @@ const topic = d => (d.classification?.labels || []).map(l => profileShort(LABEL_
         <button type="button" class="doccard" @click="open(d)">
           <span class="doccard__top"><b>{{ d.publication_code }}</b><Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" /></span>
           <span class="doccard__title">{{ d.title || d.original_filename }}</span>
+          <span v-if="d.status_hint" class="muted">{{ d.status_hint }}</span>
           <span class="doccard__meta muted">
             <template v-if="d.status === 'processing'">{{ STAGE[d.processing?.stage] }}</template>
             <template v-else-if="d.records">{{ countText(d.records, ['запись', 'записи', 'записей']) }}</template>
@@ -154,6 +167,8 @@ const topic = d => (d.classification?.labels || []).map(l => profileShort(LABEL_
             </td>
             <td class="docs__status">
               <Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" />
+              <span v-if="d.status_hint" class="faint docs__stage" style="max-width: 250px">{{ d.status_hint }}</span>
+              <button v-if="d.status === 'blocked' && editable" class="btn btn--sm" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)">Повторить задание</button>
               <span v-if="d.status === 'processing' && d.processing" class="faint docs__stage">{{ STAGE[d.processing.stage] }}<template v-if="d.processing.progress?.total && ['text', 'extract'].includes(d.processing.stage)">, {{ d.processing.progress.done }}/{{ d.processing.progress.total }}</template></span>
             </td>
             <td class="t-num">{{ d.records ? fmtNum(d.records, 0) : '–' }}</td>
@@ -181,7 +196,7 @@ const topic = d => (d.classification?.labels || []).map(l => profileShort(LABEL_
 .docs__file { display: block; font-size: var(--fs-sm); }
 .docs__topics { display: inline-flex; gap: 4px; }
 .docs__status { white-space: nowrap; }
-.docs__stage { display: block; margin-top: 3px; font-size: var(--fs-xs); }
+.docs__stage { display: block; margin-top: 3px; font-size: var(--fs-xs); white-space: normal; }
 .cb { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 @media (max-width: 719px) { .docs__filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; } .docs__filter { flex: none; } }
 .doccards { display: flex; flex-direction: column; gap: 8px; }
