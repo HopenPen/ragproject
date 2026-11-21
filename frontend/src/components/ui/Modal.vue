@@ -45,22 +45,22 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </template>
 
 <style>
-.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: var(--s-6); background: var(--scrim); }
-.modal__box { width: min(var(--w), 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--shadow-overlay); }
-.modal__box:focus-visible { box-shadow: var(--shadow-overlay); }
-.modal__head { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-5) var(--s-5) var(--s-2); }
-.modal__head h2 { flex: 1; font-size: var(--fs-lg); }
-.modal__body { padding: var(--s-2) var(--s-5) var(--s-5); overflow: auto; }
-.modal__foot { display: flex; justify-content: flex-end; gap: var(--s-2); padding: var(--s-3) var(--s-5) var(--s-5); }
-.modal-enter-active, .modal-leave-active { transition: opacity .18s var(--ease); }
-.modal-enter-active .modal__box, .modal-leave-active .modal__box { transition: transform .22s var(--ease); }
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: var(--scrim); }
+.modal__box { width: min(var(--w), 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); }
+.modal__box:focus-visible { outline: none; }
+.modal__head { display: flex; align-items: center; gap: 8px; height: 48px; flex: none; padding: 0 10px 0 16px; border-bottom: 1px solid var(--u-line); }
+.modal__head h2 { flex: 1; font-size: 13px; line-height: 20px; font-weight: 500; }
+.modal__body { padding: 16px; overflow: auto; }
+.modal__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--u-line); background: var(--u-fill); border-radius: 0 0 12px 12px; }
+.modal-enter-active, .modal-leave-active { transition: opacity 180ms var(--u-ease); }
+.modal-enter-active .modal__box, .modal-leave-active .modal__box { transition: transform 240ms var(--u-spring); }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
-.modal-enter-from .modal__box { transform: translateY(8px) scale(.985); }
+.modal-enter-from .modal__box { transform: translateY(6px) scale(.98); }
 @media (max-width: 719px) {
   .modal { place-items: end stretch; padding: 0; }
-  .modal__box { width: 100%; max-height: 92vh; border-radius: var(--r-xl) var(--r-xl) 0 0; padding-bottom: env(safe-area-inset-bottom); }
-  .modal-enter-from .modal__box { transform: translateY(40px); }
-  .modal__foot { flex-direction: column-reverse; }
+  .modal__box { width: 100%; max-height: 92vh; border-radius: 12px 12px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .modal-enter-from .modal__box { transform: translateY(32px); }
+  .modal__foot { flex-direction: column-reverse; border-radius: 0; }
   .modal__foot .btn { width: 100%; }
 }
 </style>

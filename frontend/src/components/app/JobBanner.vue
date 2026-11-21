@@ -45,6 +45,7 @@ const summary = computed(() => {
 
 <template>
   <div v-if="job" class="jbanner" :class="{ 'jbanner--wait': waiting }">
+    <span class="jbanner__mark" :class="waiting ? 'is-wait' : finished ? 'is-done' : 'is-run'" aria-hidden="true" />
     <div class="jbanner__text">
       <p class="jbanner__title">
         <template v-if="waiting">{{ JOB_KIND[job.kind] }} ждёт решения по теме<template v-if="waitingDoc">: {{ waitingDoc.publication_code }}</template></template>
@@ -60,7 +61,7 @@ const summary = computed(() => {
       <Progress v-if="!finished && !waiting" :value="value" class="jbanner__bar" />
     </div>
     <div class="jbanner__actions">
-      <button v-if="waiting && waitingDoc && canEdit(ws.corpus)" class="btn btn--primary btn--sm" type="button" @click="decide = waitingDoc">Решить</button>
+      <button v-if="waiting && waitingDoc && canEdit(ws.corpus)" class="btn btn--primary btn--sm" type="button" @click="decide = waitingDoc">Решить тему</button>
       <button class="btn btn--sm" type="button" @click="drawer = job.id">Подробнее</button>
       <button v-if="finished" class="btn btn--ghost btn--icon btn--sm" type="button" aria-label="Скрыть" @click="dismissed.add(job.id)"><X /></button>
     </div>
@@ -70,16 +71,21 @@ const summary = computed(() => {
 </template>
 
 <style>
-.jbanner { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-4); padding: 12px 14px 12px 16px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--r-lg); background: var(--surface); }
-.jbanner--wait { border-left-color: var(--warn-line); }
+/* полоса задания: строка статуса из окна кита; идущая работа отмечена акцентом, ожидание чернилами */
+.jbanner { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 10px 10px 14px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; }
+.jbanner__mark { width: 14px; height: 14px; flex: none; align-self: flex-start; margin-top: 3px; border-radius: 50%; }
+.jbanner__mark.is-run { border: 2px solid color-mix(in oklab, var(--u-accent) 30%, transparent); border-top-color: var(--u-accent); animation: ui-spin 800ms linear infinite; }
+.jbanner__mark.is-wait { width: 8px; height: 8px; margin: 6px 3px 0; background: var(--u-ink); }
+.jbanner__mark.is-done { width: 8px; height: 8px; margin: 6px 3px 0; background: var(--u-accent); }
 .jbanner__text { flex: 1; min-width: 0; }
 .jbanner__title { display: flex; align-items: center; gap: 10px; font-weight: 500; flex-wrap: wrap; }
-.jbanner__sub { margin-top: 2px; font-size: var(--fs-sm); }
-.jbanner__bar { margin-top: 10px; max-width: 520px; }
+.jbanner__sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.jbanner__bar { margin-top: 8px; max-width: 520px; }
 .jbanner__actions { display: flex; gap: 6px; flex: none; }
 @media (max-width: 719px) {
   .jbanner__why { display: none; }
-  .jbanner { flex-direction: column; align-items: stretch; gap: 10px; }
+  .jbanner { flex-wrap: wrap; gap: 10px; }
+  .jbanner__actions { flex-basis: 100%; }
   .jbanner__actions .btn { flex: 1; }
 }
 </style>

@@ -93,15 +93,16 @@ async function activate (v) {
 </template>
 
 <style>
-.hist__sub { margin-top: 2px; font-size: var(--fs-sm); }
-.hist { margin-top: var(--s-4); display: flex; flex-direction: column; }
-.hist__item { position: relative; padding: 12px 0 14px 18px; border-left: 2px solid var(--line); }
-.hist__item::before { content: ""; position: absolute; left: -6px; top: 17px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line-strong); }
-.hist__item.is-active::before { border-color: var(--accent); background: var(--accent); }
-.hist__top { display: flex; align-items: center; gap: 10px; font-size: var(--fs-md); }
-.hist__top .faint { font-size: var(--fs-sm); }
-.hist__who { margin-top: 3px; font-size: var(--fs-sm); color: var(--ink-2); }
-.hist__reason { margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
-.hist__diff { margin-top: 6px; font-size: var(--fs-sm); }
+.hist__sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.hist { margin-top: 12px; display: flex; flex-direction: column; }
+.hist__item { position: relative; padding: 10px 0 14px 20px; box-shadow: inset 1px 0 0 var(--u-line-2); margin-left: 4px; }
+.hist__item::before { content: ""; position: absolute; left: -4px; top: 16px; width: 9px; height: 9px; border-radius: 50%; background: var(--u-bg); box-shadow: inset 0 0 0 1.5px var(--u-soft); }
+.hist__item.is-active::before { background: var(--u-accent); box-shadow: none; }
+.hist__top { display: flex; align-items: center; gap: 10px; }
+.hist__top b, .hist__top strong { font-weight: 500; }
+.hist__top .faint { font-size: 12px; }
+.hist__who { margin-top: 2px; color: var(--u-text-2); }
+.hist__reason { margin-top: 4px; color: var(--u-muted); }
+.hist__diff { margin-top: 4px; font-size: 12px; line-height: 16px; }
 .hist__btn { margin-top: 10px; }
 </style>

@@ -1,26 +1,53 @@
+/* Назначение файла: палитры тем для UI-кита taste-skill (тот же кит, из которого собраны макеты продукта на лендинге).
+   Кит выводит все цвета интерфейса из пяти базовых (--fx-bg, --fx-ink, --fx-muted, --fx-accent, --fx-accent-ink)
+   и сам понимает, светлая тема или тёмная: тени, линии и заливки считаются от фона. Поэтому темы отличаются
+   только этими базовыми цветами. Тёмная: палитра лендинга на ступень светлее. Светлая: инверсная палитра лендинга.
+   Отдельно задаются только тексты статусов (тот же тон, светлота под контраст 4,5:1) и цвет бумаги PDF. */
+
 :root {
-  color-scheme: light;
-  --bg: #eae6de; --surface: #f8f6f1; --surface-2: #f0ede6; --surface-hover: #e4e0d6;
-  --ink: #262721; --muted: #65665d; --faint: #797b70; --line: #d6d3c8; --line-strong: #b9bdad;
-  --accent: #426c45; --accent-text: #315d35; --accent-soft: #e0ead9; --accent-hover: #345a37; --on-accent: #fff;
-  --warn: #976319; --warn-soft: #f5e8cb; --danger: #ac4135; --danger-soft: #f4e0dc;
-  --ok: #426c45; --ok-soft: #e0ead9; --run: #426e87; --run-soft: #e0ebf0;
-  --paper: #f6f2e8; --shadow: 0 12px 48px #292f2424; --shadow-lg: 0 20px 80px #292f2438;
-  --focus: 0 0 0 3px #61864f66; --font: 'Geologica', system-ui, sans-serif; --mono: 'Geist Mono', monospace;
-  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 16px; --fs-xl: 22px; --lh: 1.55;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 40px; --s-8: 48px;
-  --r-sm: 4px; --r-md: 7px; --r-lg: 12px; --ease: cubic-bezier(.2,.7,.2,1);
-  --accent-ink: var(--on-accent); --ink-2: var(--muted); --danger-fill: var(--danger-soft); --danger-line: var(--danger);
-  --warn-fill: var(--warn-soft); --warn-line: var(--warn); --info: var(--run); --info-fill: var(--run-soft);
-  --surface-sunk: var(--bg); --shadow-overlay: var(--shadow-lg); --shadow-page: 0 2px 12px #0002; --scrim: #14171288;
-  --header-h: 58px; --tabbar-h: 56px; --r-xl: 16px; --fs-2xl: 28px; --s-10: 64px;
+  --font: "Geologica", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --ui-font: var(--font);
+  --ui-mono: var(--mono);
+  --ui-radius: 12px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+
+  --ochre: #B7791F;
+  --red: #C4432F;
+  --blue: #3B78AE;
 }
-:root[data-theme='dark'] {
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --fx-bg: #F1F1EF;
+  --fx-surface: #E0E0DE;
+  --fx-ink: #1C1C1C;
+  --fx-muted: #505050;
+  --fx-accent: #07854A;
+  --fx-accent-ink: #FFFFFF;
+
+  --accent-text-tone: #006435;
+  --warn-tone: #7B4C00;
+  --danger-tone: #A11E0A;
+  --info-tone: #1C5B8F;
+  --paper-tone: #F5F2EA;
+  --scrim-a: 34%;
+}
+
+[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1c1c1b; --surface: #252622; --surface-2: #2d2e28; --surface-hover: #383b32;
-  --ink: #e6e7df; --muted: #b3b5a8; --faint: #929688; --line: #3c4035; --line-strong: #575e4c;
-  --accent: #96b27c; --accent-text: #b1cd97; --accent-soft: #33402b; --accent-hover: #acc78e; --on-accent: #192415;
-  --warn: #e4b267; --warn-soft: #483b25; --danger: #ed998a; --danger-soft: #4a302d;
-  --ok: #a1bf87; --ok-soft: #33402b; --run: #9cbfd0; --run-soft: #2b3c46;
-  --paper: #ece8df; --shadow: 0 12px 48px #0006; --shadow-lg: 0 20px 80px #0008;
+  --fx-bg: #222222;
+  --fx-surface: #2C2C2C;
+  --fx-ink: #F1F1EF;
+  --fx-muted: #ADADA8;
+  --fx-accent: #07854A;
+  --fx-accent-ink: #FFFFFF;
+
+  --accent-text-tone: #4FB678;
+  --warn-tone: #DC9C49;
+  --danger-tone: #FF806A;
+  --info-tone: #73B1EA;
+  --paper-tone: #E5E0D6;
+  --scrim-a: 56%;
 }

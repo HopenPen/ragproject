@@ -101,7 +101,7 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
         <option value="primary">только из статьи</option>
         <option value="cited">только цитаты</option>
       </select>
-      <label class="check res__check"><input v-model="issuesOnly" type="checkbox">С замечаниями</label>
+      <label class="check res__check"><input v-model="issuesOnly" type="checkbox" class="cb">С замечаниями</label>
       <button v-if="filtered" class="btn btn--ghost btn--sm" type="button" @click="reset"><X />Сбросить</button>
     </div>
 
@@ -127,8 +127,8 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
             <td class="t-num"><b class="res__val">{{ fmtResult(r) }}</b></td>
             <td class="res__ctx">{{ isSolar ? r.context.device : `${r.context.config || '–'}${r.context.retrieval ? ', ' + r.context.retrieval : ''}` }}</td>
             <td class="res__ctx muted">{{ isSolar ? conditions(r) : [r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</td>
-            <td class="nowrap"><span v-if="r.source.has_evidence" class="muted">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></span><span v-else class="res__nosrc">нет источника</span></td>
-            <td class="t-num"><span v-if="r.issues_open" class="count count--warn">{{ r.issues_open }}</span><span v-else class="faint">–</span></td>
+            <td class="nowrap"><span v-if="r.source.has_evidence" class="src-pill">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></span><span v-else class="src-pill src-pill--none">нет источника</span></td>
+            <td class="t-num"><span v-if="r.issues_open" class="count count--warn">{{ r.issues_open }}</span></td>
           </tr>
         </tbody>
       </table>
@@ -140,7 +140,7 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
         <span>Выбрано {{ countText(selected.size, ['результат', 'результата', 'результатов']) }}</span>
         <span class="grow" />
         <button class="btn btn--ghost btn--sm selbar__clear" type="button" @click="selected.clear()">Снять выбор</button>
-        <button class="btn btn--primary btn--sm" type="button" :disabled="selected.size < 2" @click="compareOpen = true"><GitCompare />Сравнить</button>
+        <button class="btn btn--accent btn--sm" type="button" :disabled="selected.size < 2" @click="compareOpen = true"><GitCompare />Сравнить</button>
       </div>
     </Transition>
     <CompareDrawer :open="compareOpen" :corpus-id="ws.corpus.id" :profile="profile" :refs="refs" @close="compareOpen = false" />
@@ -148,23 +148,24 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
 </template>
 
 <style>
-.res__filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: var(--s-3); }
+/* таблица результатов как окно результатов на лендинге: тихая шапка, строки 44 px, источник плашкой */
+.res__filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .res__search { position: relative; display: flex; align-items: center; }
-.res__search svg { position: absolute; left: 9px; width: 15px; height: 15px; color: var(--muted); }
+.res__search svg { position: absolute; left: 9px; width: 14px; height: 14px; color: var(--u-muted); pointer-events: none; }
 .res__search .input { width: 260px; padding-left: 30px; }
 .res__sel { width: auto; min-width: 150px; }
-.res__check { font-size: var(--fs-sm); margin-left: 4px; }
-.res__table { overflow: auto; margin-bottom: 72px; }
+.res__check { margin-left: 4px; color: var(--u-text-2); }
+.res__table { overflow: auto; margin-bottom: 80px; }
+.res__table .table th { height: 34px; font-size: 12px; background: var(--u-fill); }
 .res__val { font-weight: 500; }
-.res__ctx { max-width: 280px; }
-.res__cited { margin-left: 6px; }
-.res__nosrc { color: var(--danger); font-size: var(--fs-sm); }
-.th-sort { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
-.th-sort:hover { color: var(--ink); }
-.selbar { position: fixed; left: 50%; bottom: 20px; z-index: 35; display: flex; align-items: center; gap: 12px; width: min(560px, calc(100vw - 32px)); padding: 8px 8px 8px 18px; transform: translateX(-50%); background: var(--ink); color: var(--bg); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); font-weight: 500; }
-.selbar__clear { color: inherit; }
-.selbar__clear:hover { background: rgba(255, 255, 255, .12); }
-[data-theme="dark"] .selbar__clear:hover { background: rgba(0, 0, 0, .08); }
-.selbar-enter-active, .selbar-leave-active { transition: opacity .18s var(--ease), transform .18s var(--ease); }
+.res__ctx { max-width: 280px; color: var(--u-text-2); }
+.res__ctx.muted { color: var(--u-muted); }
+.res__cited { margin-left: 6px; height: 20px; font-size: 12px; }
+.src-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--u-fill-2); color: var(--u-text-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.src-pill--none { background: none; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 35%, transparent); }
+.th-sort { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+.th-sort:hover { color: var(--u-ink); }
+.selbar { position: fixed; left: 50%; bottom: 20px; z-index: 35; display: flex; align-items: center; gap: 10px; width: min(520px, calc(100vw - 32px)); padding: 8px 8px 8px 16px; transform: translateX(-50%); background: var(--u-bg); color: var(--u-ink); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); font-weight: 500; }
+.selbar-enter-active, .selbar-leave-active { transition: opacity 180ms var(--u-ease), transform 240ms var(--u-spring); }
 .selbar-enter-from, .selbar-leave-to { opacity: 0; transform: translate(-50%, 8px); }
 </style>

@@ -5,7 +5,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, History, Plus, RefreshCw, CircleAlert, Hourglass, FileX, Ban } from '@lucide/vue'
+import { ChevronLeft, History, Plus, RefreshCw } from '@lucide/vue'
 import PdfViewer from '../components/app/PdfViewer.vue'
 import RecordDetail from '../components/app/RecordDetail.vue'
 import EntityForm from '../components/app/EntityForm.vue'
@@ -14,7 +14,6 @@ import ClassificationDialog from '../components/app/ClassificationDialog.vue'
 import Drawer from '../components/ui/Drawer.vue'
 import Chip from '../components/ui/Chip.vue'
 import Metric from '../components/ui/Metric.vue'
-import Segmented from '../components/ui/Segmented.vue'
 import Progress from '../components/ui/Progress.vue'
 import { documents, publications, catalog, jobs } from '../api/index.js'
 import { ws, kickJobs } from '../stores/workspace.js'
@@ -123,6 +122,8 @@ const items = computed(() => {
   return onlyIssues.value ? list.filter(it => openByRecord.value[it[ID_FIELD[type.value]]]) : list
 })
 const isResult = computed(() => type.value === 'solar_result' || type.value === 'rag_result')
+const rid = it => it[ID_FIELD[type.value]]
+const pageOf = it => evidenceOf(graph.value, rid(it))?.page
 const selectedItem = computed(() => graph.value?.entities[type.value]?.find(it => it[ID_FIELD[type.value]] === selectedId.value) || null)
 function toneOf (id) {
   const list = openByRecord.value[id] || []
@@ -208,15 +209,17 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 <template>
   <div class="art" :class="{ 'art--mobile': ui.mobile }">
     <header class="art__head">
-      <RouterLink :to="`/corpora/${corpusId}/documents`" class="btn btn--ghost btn--sm art__back" aria-label="К документам"><ChevronLeft /><span v-if="!ui.mobile">Документы</span></RouterLink>
+      <RouterLink :to="`/corpora/${corpusId}/documents`" class="btn btn--ghost btn--icon art__back" aria-label="К документам" title="К документам"><ChevronLeft /></RouterLink>
       <template v-if="doc">
+        <span class="ui-avatar" :data-tone="cls?.labels?.includes('solar') ? 2 : cls?.labels?.includes('rag') ? 4 : 0" aria-hidden="true">{{ cls?.labels?.includes('solar') ? 'S' : cls?.labels?.includes('rag') ? 'R' : '–' }}</span>
         <b class="art__code">{{ doc.publication_code }}</b>
         <h1 class="art__title" :title="doc.title || doc.original_filename">{{ doc.title || doc.original_filename }}</h1>
-        <span v-for="t in topicChips" v-show="!ui.mobile" :key="t" class="chip chip--plain">{{ t }}</span>
-        <Segmented v-if="pub && Object.keys(pub.profiles).length > 1" :model-value="profile" :options="Object.keys(pub.profiles).map(p => ({ value: p, label: profileShort(p) }))" size="sm" label="Профиль" @update:model-value="switchProfile" />
         <span class="grow" />
-        <button v-if="graph && pub?.profiles?.[profile]?.candidates && !ui.mobile" class="chip chip--wait art__cand" type="button" @click="historyOpen = true">Есть новая версия</button>
-        <button v-if="graph && !ui.mobile" class="btn btn--sm" type="button" @click="historyOpen = true"><History />Версия {{ graph.revision_number }}</button>
+        <div v-if="pub && Object.keys(pub.profiles).length > 1" class="art__profiles" role="tablist" aria-label="Профиль">
+          <button v-for="p in Object.keys(pub.profiles)" :key="p" type="button" role="tab" class="pill" :class="{ 'is-on': p === profile }" :aria-selected="p === profile" @click="switchProfile(p)">{{ profileShort(p) }}</button>
+        </div>
+        <button v-if="graph && pub?.profiles?.[profile]?.candidates && !ui.mobile" class="chip chip--wait art__cand" type="button" @click="historyOpen = true">Новая версия</button>
+        <button v-if="graph && !ui.mobile" class="btn btn--ghost btn--sm" type="button" @click="historyOpen = true"><History />Версия {{ graph.revision_number }}</button>
       </template>
     </header>
 
@@ -226,41 +229,45 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
       </section>
 
       <aside class="art__panel">
-        <div v-if="loading" class="art__pad"><div v-for="i in 5" :key="i" class="skeleton" style="height: 44px; margin-bottom: 8px" /></div>
+        <div v-if="loading" class="art__pad"><div v-for="i in 6" :key="i" class="skeleton" style="height: 20px; margin: 12px 0" /></div>
 
         <template v-else-if="state === 'graph'">
-          <div class="art__tabs" role="tablist" aria-label="Типы записей">
-            <button v-for="t in entityTabs" :key="t.value" type="button" role="tab" class="art__tab" :class="{ 'is-on': t.value === type }" :aria-selected="t.value === type" @click="setType(t.value)">
-              {{ t.label }}<span class="num">{{ t.count }}</span>
-            </button>
-          </div>
-          <div class="art__tools">
-            <label v-if="issueCount" class="check art__only"><input v-model="onlyIssues" type="checkbox">Только с замечаниями <span class="count count--warn">{{ issueCount }}</span></label>
-            <span class="grow" />
-            <button v-if="editable && !ui.mobile" class="btn btn--sm btn--ghost" type="button" @click="create"><Plus />Добавить</button>
-          </div>
-          <div v-if="needsRecheck" class="art__recheck">
-            <p>Граф изменён. Замечания посчитаны по прежней версии.</p>
-            <button class="btn btn--sm" type="button" :disabled="!!recheckJob || !editable" @click="recheck"><RefreshCw />{{ recheckJob ? 'Проверяю…' : 'Пересчитать' }}</button>
+          <div class="art__top">
+            <div class="art__tabs" role="tablist" aria-label="Типы записей">
+              <button v-for="t in entityTabs" :key="t.value" type="button" role="tab" class="pill" :class="{ 'is-on': t.value === type }" :aria-selected="t.value === type" @click="setType(t.value)">
+                {{ t.label }}<span class="pill__n">{{ t.count }}</span>
+              </button>
+            </div>
+            <div v-if="issueCount || (editable && !ui.mobile)" class="art__tools">
+              <label v-if="issueCount" class="check"><input v-model="onlyIssues" type="checkbox" class="cb">С замечаниями<span class="count count--warn">{{ issueCount }}</span></label>
+              <span class="grow" />
+              <button v-if="editable && !ui.mobile" class="btn btn--ghost btn--sm" type="button" @click="create"><Plus />Добавить</button>
+            </div>
+            <div v-if="needsRecheck" class="art__recheck">
+              <span class="art__recheck-dot" aria-hidden="true" />
+              <p>Граф изменён, замечания посчитаны по прежней версии.</p>
+              <button class="btn btn--sm" type="button" :disabled="!!recheckJob || !editable" @click="recheck"><RefreshCw />{{ recheckJob ? 'Проверяю…' : 'Пересчитать' }}</button>
+            </div>
+            <div v-if="isResult && !ui.mobile && items.length" class="recs__cols" aria-hidden="true"><span>Показатель</span><span class="t-r">Значение</span><span>Источник</span></div>
           </div>
 
           <ul ref="listEl" class="recs">
-            <li v-for="it in items" :key="it[ID_FIELD[type]]" :data-id="it[ID_FIELD[type]]" class="rec" :class="{ 'is-on': selectedId === it[ID_FIELD[type]], [`rec--${toneOf(it[ID_FIELD[type]])}`]: true }">
-              <button type="button" class="rec__row" :aria-expanded="selectedId === it[ID_FIELD[type]]" @click="select(it[ID_FIELD[type]])">
-                <span class="rec__mark" aria-hidden="true" />
+            <li v-for="it in items" :key="rid(it)" :data-id="rid(it)" class="rec" :class="[{ 'is-on': selectedId === rid(it), 'rec--result': isResult }, `rec--${toneOf(rid(it))}`]">
+              <button type="button" class="rec__row" :aria-expanded="selectedId === rid(it)" @click="select(rid(it))">
                 <span class="rec__main">
                   <span class="rec__title">
+                    <i v-if="toneOf(rid(it)) !== 'idle'" class="rec__dot" aria-label="Есть замечание" />
                     <Metric v-if="isResult" :name="it.metric_name" :k="it.metric_k" />
                     <template v-else>{{ rowText(type, it, graph).title }}</template>
-                    <span class="rec__id faint">{{ it[ID_FIELD[type]] }}</span>
+                    <span class="rec__id">{{ rid(it) }}</span>
                   </span>
-                  <span class="rec__sub muted">{{ rowText(type, it, graph).sub }}</span>
+                  <span class="rec__sub">{{ rowText(type, it, graph).sub }}</span>
                 </span>
                 <span v-if="isResult" class="rec__val num">{{ fmtResult(it) }}</span>
-                <span v-if="isResult" class="rec__page faint">{{ evidenceOf(graph, it[ID_FIELD[type]]) ? `стр. ${evidenceOf(graph, it[ID_FIELD[type]]).page}` : 'нет источника' }}</span>
+                <span v-if="isResult" class="rec__src" :class="{ 'is-none': !pageOf(it) }">{{ pageOf(it) ? `стр. ${pageOf(it)}` : 'нет' }}</span>
               </button>
-              <div v-if="selectedId === it[ID_FIELD[type]] && !ui.mobile" class="rec__detail">
-                <RecordDetail :type="type" :item="it" :graph="graph" :etag="etag" :profile="profile" :publication-id="pub.id" :document-id="doc.id" :issues="issuesFor(it[ID_FIELD[type]])" :editable="editable" @edit="edit" @changed="onChanged" @stale="onStale" @issues-changed="loadIssues" />
+              <div v-if="selectedId === rid(it) && !ui.mobile" class="rec__detail">
+                <RecordDetail :type="type" :item="it" :graph="graph" :etag="etag" :profile="profile" :publication-id="pub.id" :document-id="doc.id" :issues="issuesFor(rid(it))" :editable="editable" @edit="edit" @changed="onChanged" @stale="onStale" @issues-changed="loadIssues" />
               </div>
             </li>
             <li v-if="!items.length" class="art__pad muted">{{ onlyIssues ? 'У записей этого типа нет открытых замечаний.' : 'Записей этого типа нет.' }}</li>
@@ -269,44 +276,44 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 
         <div v-else-if="doc" class="art__state">
           <template v-if="state === 'needs_review'">
-            <CircleAlert class="art__icon art__icon--warn" />
+            <span class="art__mark art__mark--wait" aria-hidden="true" />
             <h2>Тема статьи не определена уверенно</h2>
             <p>{{ cls?.note }}</p>
             <p class="muted">Оценка модели: солнечные элементы {{ fmtNum(cls?.scores?.solar, 2) }}, RAG {{ fmtNum(cls?.scores?.rag, 2) }}. Обработка продолжится после решения.</p>
-            <button v-if="editable" class="btn btn--primary" type="button" @click="decideOpen = true">Решить тему</button>
+            <button v-if="editable" class="btn btn--accent" type="button" @click="decideOpen = true">Решить тему</button>
           </template>
           <template v-else-if="state === 'processing' || state === 'queued'">
-            <Hourglass class="art__icon" />
+            <span class="art__mark art__mark--run" aria-hidden="true" />
             <h2>{{ state === 'queued' ? 'Статья в очереди' : 'Идёт обработка' }}</h2>
             <p v-if="doc.processing">{{ STAGE[doc.processing.stage] }}<template v-if="doc.processing.progress?.total">: {{ doc.processing.progress.done }} из {{ doc.processing.progress.total }} стр.</template></p>
             <Progress :value="progress" style="max-width: 280px; width: 100%" />
           </template>
           <template v-else-if="state === 'outside'">
-            <Ban class="art__icon" />
+            <span class="art__mark" aria-hidden="true" />
             <h2>Статья вне тем корпуса</h2>
             <p>В выгрузку попадёт только библиография с пометкой not_target_domain.</p>
             <blockquote v-if="cls?.labels && pub?.classification?.evidence?.[0]" class="quote">{{ pub.classification.evidence[0].fragment }}</blockquote>
           </template>
           <template v-else-if="state === 'excluded'">
-            <Ban class="art__icon" />
+            <span class="art__mark" aria-hidden="true" />
             <h2>Вне рамок профиля {{ profileShort(profile) }}</h2>
             <p>{{ cls?.note || graph?.scope?.exclusion_reason }}</p>
             <p class="muted">Записи не извлекаются. В publications.csv статья попадёт с in_scope = false и причиной.</p>
           </template>
           <template v-else-if="state === 'unreadable'">
-            <FileX class="art__icon art__icon--bad" />
+            <span class="art__mark art__mark--bad" aria-hidden="true" />
             <h2>PDF не читается</h2>
             <p>{{ cls?.note || 'Файл повреждён или защищён паролем.' }}</p>
             <p class="muted">Загрузите исправный файл под тем же кодом статьи или отметьте пропуск в выгрузке.</p>
           </template>
           <template v-else-if="state === 'blocked'">
-            <CircleAlert class="art__icon art__icon--warn" />
+            <span class="art__mark art__mark--warn" aria-hidden="true" />
             <h2>Нужен повтор обработки</h2>
             <p>{{ doc.processing?.error?.message }}</p>
             <p class="muted">Это результат предыдущей попытки. Повторите задание на странице документов.</p>
           </template>
           <template v-else>
-            <Hourglass class="art__icon" />
+            <span class="art__mark" aria-hidden="true" />
             <h2>{{ DOC_STATUS[state]?.text || 'Статья ещё не обработана' }}</h2>
             <p class="muted">Запустите обработку на странице документов.</p>
           </template>
@@ -325,58 +332,72 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 </template>
 
 <style>
+/* статья как окно продукта на лендинге: слева страница PDF, справа записи в стиле окна результатов */
 .art { display: flex; flex-direction: column; height: calc(100vh - var(--header-h)); min-height: 520px; }
-.art__head { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px var(--s-4) 8px var(--s-3); border-bottom: 1px solid var(--line); background: var(--surface); }
+.art__head { display: flex; align-items: center; gap: 10px; height: 48px; flex: none; padding: 0 12px 0 8px; box-shadow: inset 0 -1px 0 var(--u-line); }
 .art__back { flex: none; }
-.art__code { font-size: var(--fs-lg); flex: none; }
-.art__title { min-width: 0; flex: 0 1 auto; font-size: var(--fs-md); font-weight: 400; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.art__cand { border: 0; cursor: pointer; }
-.art__body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(380px, 34vw, 500px); }
-.art__pdf { min-width: 0; min-height: 0; border-right: 1px solid var(--line); }
-.art__panel { min-height: 0; overflow: auto; background: var(--surface); }
-.art__pad { padding: var(--s-4); }
-.art__tabs { position: sticky; top: 0; z-index: 2; display: flex; gap: 2px; padding: 8px 10px 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: none; }
-.art__tab { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; background: none; color: var(--muted); font-size: var(--fs-sm); font-weight: 500; white-space: nowrap; cursor: pointer; }
-.art__tab .num { color: var(--faint); }
-.art__tab:hover { color: var(--ink); }
-.art__tab.is-on { color: var(--ink); }
-.art__tab.is-on::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: var(--accent); }
-.art__tools { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 12px 4px 16px; }
-.art__only { font-size: var(--fs-sm); }
-.art__recheck { display: flex; align-items: center; gap: 10px; margin: 0 12px 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--info-fill); color: var(--info); font-size: var(--fs-sm); }
+.art__code { flex: none; font-weight: 500; }
+.art__title { min-width: 0; flex: 0 1 auto; font-size: 13px; line-height: 20px; font-weight: 400; color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.art__profiles { display: flex; gap: 4px; flex: none; }
+.art__cand { border: 0; }
+.art__body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 36vw, 520px); }
+.art__pdf { min-width: 0; min-height: 0; border-right: 1px solid var(--u-line); }
+.art__panel { min-height: 0; overflow: auto; }
+.art__pad { padding: 12px 16px; }
+.art__top { position: sticky; top: 0; z-index: 2; background: var(--u-bg); }
+.art__tabs { display: flex; gap: 4px; padding: 12px 14px 8px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.art__tools { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px 6px 16px; }
+.art__tools .check { gap: 8px; color: var(--u-text-2); }
+.art__tools .count { margin-left: 2px; }
+.art__recheck { display: flex; align-items: center; gap: 10px; margin: 0 12px 10px; padding: 8px 8px 8px 12px; border-radius: 8px; background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); color: var(--u-text-2); }
 .art__recheck p { flex: 1; }
-.recs { padding: 0 8px 24px; }
-.rec { border-radius: var(--r-md); }
-.rec + .rec { margin-top: 1px; }
-.rec__row { position: relative; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; width: 100%; padding: 9px 10px 9px 8px; border: 0; border-radius: var(--r-md); background: none; text-align: left; cursor: pointer; }
-.rec__row:hover { background: var(--surface-hover); }
-.rec__mark { grid-row: 1 / 3; align-self: stretch; width: 3px; margin-left: 2px; border-radius: 2px; background: transparent; }
-.rec--warn .rec__mark { background: var(--warn-line); }
-.rec--error .rec__mark { background: var(--danger-line); }
-.rec.is-on .rec__mark { background: var(--accent); }
-.rec__main { grid-column: 2; grid-row: 1 / 3; min-width: 0; }
-.rec__title { display: flex; align-items: baseline; gap: 8px; font-weight: 500; }
-.rec__id { font-size: var(--fs-xs); font-weight: 400; }
-.rec__sub { display: block; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rec__val { grid-column: 3; grid-row: 1; text-align: right; font-weight: 500; white-space: nowrap; }
-.rec__page { grid-column: 3; grid-row: 2; text-align: right; font-size: var(--fs-xs); white-space: nowrap; }
-.rec--error .rec__page { color: var(--danger); }
-.rec.is-on > .rec__row { background: var(--accent-soft); }
-.rec__detail { padding: 8px 12px 14px 22px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
-.art__state { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: var(--s-8) var(--s-6); max-width: 460px; }
-.art__state h2 { font-size: var(--fs-lg); }
+.art__recheck-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--u-ink); flex: none; }
+
+/* общий вид таблеток-вкладок, как в окне результатов на лендинге */
+.pill { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: 99px; background: none; color: var(--u-muted); font-size: 13px; white-space: nowrap; transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease); }
+.pill:hover { color: var(--u-ink); background: var(--u-fill); }
+.pill.is-on { color: var(--u-ink); background: var(--u-fill-2); font-weight: 500; }
+.pill__n { color: var(--u-soft); font-variant-numeric: tabular-nums; font-weight: 400; }
+.pill.is-on .pill__n { color: var(--u-muted); }
+
+.recs__cols, .rec--result .rec__row { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; column-gap: 12px; }
+.recs__cols { height: 30px; align-items: center; padding: 0 16px; font-size: 12px; line-height: 16px; color: var(--u-soft); box-shadow: inset 0 -1px 0 var(--u-line); }
+.recs__cols .t-r { text-align: right; }
+.recs { padding: 0 0 32px; }
+.rec { box-shadow: inset 0 -1px 0 var(--u-line); scroll-margin-top: 132px; }
+.rec__row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; width: 100%; min-height: 52px; padding: 8px 16px; border: 0; background: none; text-align: left; transition: background-color 160ms var(--u-ease); }
+.rec__row:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
+.rec.is-on > .rec__row { background: var(--u-tint); }
+.rec__main { min-width: 0; }
+.rec__title { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.rec__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ochre); flex: none; }
+.rec--error .rec__dot { background: var(--red); }
+.rec__id { font-size: 12px; font-weight: 400; color: var(--u-soft); }
+.rec__sub { display: block; color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec__val { text-align: right; font-weight: 500; white-space: nowrap; }
+.rec__src { justify-self: start; padding: 2px 8px; border-radius: 6px; background: var(--u-fill-2); color: var(--u-text-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.rec__src.is-none { background: none; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 35%, transparent); }
+.rec__detail { padding: 14px 16px 18px; background: var(--u-fill); box-shadow: inset 0 1px 0 var(--u-line); }
+
+.art__state { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 40px 24px; max-width: 460px; color: var(--u-text-2); }
+.art__state h2 { font-size: 15px; line-height: 20px; color: var(--u-ink); }
 .art__state .quote { margin-top: 6px; }
-.art__icon { width: 26px; height: 26px; color: var(--muted); }
-.art__icon--warn { color: var(--warn); }
-.art__icon--bad { color: var(--danger); }
+.art__state .btn { margin-top: 8px; }
+.art__mark { width: 10px; height: 10px; margin-bottom: 4px; border-radius: 50%; background: var(--u-soft); }
+.art__mark--wait { background: var(--u-ink); }
+.art__mark--warn { background: var(--ochre); }
+.art__mark--bad { background: var(--red); }
+.art__mark--run { background: none; width: 14px; height: 14px; border: 2px solid color-mix(in oklab, var(--u-accent) 30%, transparent); border-top-color: var(--u-accent); animation: ui-spin 800ms linear infinite; }
+
 .art--mobile { height: auto; min-height: calc(100vh - var(--header-h)); }
-.art--mobile .art__head { flex-wrap: wrap; padding: 8px 12px; }
-.art--mobile .art__title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex-basis: 100%; order: 5; }
+.art--mobile .art__head { height: auto; min-height: 48px; flex-wrap: wrap; padding: 6px 10px 6px 4px; row-gap: 2px; }
+.art--mobile .art__title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex-basis: 100%; order: 5; padding: 0 0 6px 44px; }
 .art--mobile .art__body { display: block; }
-.art--mobile .art__panel { overflow: visible; padding-bottom: calc(var(--tabbar-h) + 16px); background: var(--bg); }
-.art--mobile .art__tabs { top: var(--header-h); background: var(--bg); }
-.art--mobile .rec__row { padding: 12px 10px 12px 8px; }
+.art--mobile .art__panel { overflow: visible; padding-bottom: calc(var(--tabbar-h) + 16px); }
+.art--mobile .art__top { top: var(--header-h); }
+.art--mobile .rec__row { grid-template-columns: minmax(0, 1fr) auto; min-height: 56px; padding: 10px 14px; }
+.art--mobile .rec__src { display: none; }
 @media (max-width: 1100px) and (min-width: 720px) {
-  .art__body { grid-template-columns: minmax(0, 1fr) 380px; }
+  .art__body { grid-template-columns: minmax(0, 1fr) 400px; }
 }
 </style>

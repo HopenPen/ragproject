@@ -78,24 +78,25 @@ function expand () { expanded.value = true; setTimeout(() => input.value?.focus(
 
 <style>
 .gsearch { position: relative; }
-.gsearch__box { display: flex; align-items: center; gap: 8px; width: 300px; height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface-2); cursor: text; }
-.gsearch__box:focus-within { border-color: var(--accent); box-shadow: var(--focus); }
-.gsearch__icon { width: 16px; height: 16px; color: var(--muted); flex: none; }
-.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: var(--fs-md); }
+.gsearch__box { display: flex; align-items: center; gap: 8px; width: 240px; height: 30px; padding: 0 4px 0 9px; border-radius: 7px; background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2); cursor: text; transition: box-shadow 160ms var(--u-ease); }
+.gsearch__box:focus-within { box-shadow: inset 0 0 0 1px var(--u-accent), 0 0 0 3px color-mix(in oklab, var(--u-accent) 22%, transparent); }
+.gsearch__icon { width: 14px; height: 14px; color: var(--u-muted); flex: none; }
+.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 13px; color: var(--u-ink); }
+.gsearch__input::placeholder { color: var(--u-soft); }
 .gsearch__input::-webkit-search-cancel-button { display: none; }
-.gsearch__kbd { padding: 0 6px; border: 1px solid var(--line-strong); border-radius: 4px; font: 500 11px/18px var(--font); color: var(--muted); }
-.gsearch__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 45; width: min(560px, 92vw); max-height: 70vh; overflow: auto; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); }
-.gsearch__note { padding: 12px; color: var(--muted); font-size: var(--fs-sm); }
-.gsearch__item { display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; cursor: pointer; }
-.gsearch__item.is-active { background: var(--surface-hover); }
-.gsearch__meta { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-sm); color: var(--muted); }
-.gsearch__meta b { color: var(--ink); font-weight: 600; flex: none; }
+.gsearch__kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; font: 500 12px/1 var(--ui-font); color: var(--u-muted); background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2), inset 0 -1px 0 var(--u-line); }
+.gsearch__panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 45; width: min(540px, 92vw); max-height: 70vh; overflow: auto; padding: 6px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); }
+.gsearch__note { padding: 10px; color: var(--u-muted); }
+.gsearch__item { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; text-align: left; }
+.gsearch__item.is-active { background: var(--u-fill-2); }
+.gsearch__meta { display: flex; align-items: baseline; gap: 8px; color: var(--u-muted); }
+.gsearch__meta b { color: var(--u-ink); font-weight: 500; flex: none; }
 .gsearch__meta .ellipsis { flex: 1; }
-.gsearch__page { flex: none; }
-.gsearch__snip { display: block; margin-top: 3px; font-size: var(--fs-sm); color: var(--ink-2); line-height: 1.4; }
-.gsearch__snip mark { background: var(--accent-soft); color: var(--accent-text); border-radius: 2px; padding: 0 1px; }
-.gsearch.is-compact.is-expanded { position: fixed; inset: 0 0 auto 0; z-index: 46; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.gsearch__page { flex: none; color: var(--u-soft); }
+.gsearch__snip { display: block; margin-top: 2px; color: var(--u-text-2); }
+.gsearch__snip mark { background: var(--u-tint-2); color: var(--u-ink); border-radius: 3px; padding: 0 2px; }
+.gsearch.is-compact.is-expanded { position: fixed; inset: 0 0 auto 0; z-index: 46; padding: 8px 10px; background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
 .gsearch.is-compact.is-expanded .gsearch__box { width: 100%; height: 40px; }
 .gsearch.is-compact.is-expanded .gsearch__panel { position: fixed; left: 8px; right: 8px; top: 60px; width: auto; max-height: calc(100vh - 140px); }
-@media (max-width: 1180px) { .gsearch:not(.is-compact) .gsearch__box { width: 220px; } }
+@media (max-width: 1180px) { .gsearch:not(.is-compact) .gsearch__box { width: 200px; } }
 </style>

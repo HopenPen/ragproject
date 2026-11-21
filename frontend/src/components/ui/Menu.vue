@@ -36,16 +36,16 @@ defineExpose({ close })
 
 <style>
 .menu { position: relative; }
-.menu__list { position: absolute; top: calc(100% + 6px); z-index: 40; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); }
+.menu__list { position: absolute; top: calc(100% + 6px); z-index: 40; padding: 6px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); }
 .menu__list--end { right: 0; }
 .menu__list--start { left: 0; }
-.menu__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; font-size: var(--fs-md); color: var(--ink); cursor: pointer; text-decoration: none; }
-.menu__item:hover { background: var(--surface-hover); text-decoration: none; }
-.menu__item svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
-.menu__item.is-active { color: var(--accent-text); font-weight: 500; }
-.menu__item[disabled] { opacity: .5; pointer-events: none; }
-.menu__sep { height: 1px; margin: 6px 4px; background: var(--line); }
-.menu__label { padding: 6px 10px 4px; font-size: var(--fs-xs); color: var(--muted); }
-.menu-enter-active, .menu-leave-active { transition: opacity .12s var(--ease), transform .12s var(--ease); }
+.menu__item { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; text-align: left; font-size: 13px; line-height: 16px; color: var(--u-muted); text-decoration: none !important; white-space: nowrap; }
+.menu__item:hover { background: var(--u-fill-2); color: var(--u-ink); }
+.menu__item svg { width: 15px; height: 15px; flex: none; }
+.menu__item.is-active { color: var(--u-ink); font-weight: 500; background: var(--u-fill); }
+.menu__item[disabled] { opacity: .45; pointer-events: none; }
+.menu__sep { height: 1px; margin: 6px 2px; background: var(--u-line); }
+.menu__label { padding: 6px 8px 4px; font-size: 13px; line-height: 16px; color: var(--u-soft); }
+.menu-enter-active, .menu-leave-active { transition: opacity 140ms var(--u-ease), transform 160ms var(--u-ease); }
 .menu-enter-from, .menu-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

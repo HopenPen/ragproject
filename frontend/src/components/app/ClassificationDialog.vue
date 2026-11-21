@@ -70,7 +70,7 @@ async function submit () {
       <fieldset class="cls__topics">
         <legend class="field__label">Ваше решение</legend>
         <div v-for="t in TOPICS" :key="t.label" class="cls__topic">
-          <label class="check"><input v-model="labels" type="checkbox" :value="t.label"><span>{{ t.title }}<span class="faint">, {{ t.hint }}</span></span></label>
+          <label class="check"><input v-model="labels" type="checkbox" class="cb" :value="t.label"><span>{{ t.title }}<span class="faint">, {{ t.hint }}</span></span></label>
           <div v-if="labels.includes(t.label)" class="cls__scope">
             <label class="check"><input v-model="scope[t.profile]" type="radio" :value="true">в рамках профиля</label>
             <label class="check"><input v-model="scope[t.profile]" type="radio" :value="false">вне рамок (например, тандем)</label>
@@ -94,14 +94,17 @@ async function submit () {
 </template>
 
 <style>
-.cls { gap: var(--s-5); }
-.cls__scores { display: flex; gap: var(--s-6); margin: 6px 0 10px; }
-.cls__scores li { display: flex; align-items: baseline; gap: 8px; }
-.cls__scores b { font-size: var(--fs-lg); font-weight: 600; }
-.cls__note { margin-bottom: 10px; color: var(--warn); }
-.cls__where { margin-top: 4px; font-size: var(--fs-xs); }
+.cls { gap: 18px; }
+.cls__model > .muted { color: var(--u-soft); }
+.cls__scores { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 10px; }
+.cls__scores li { display: grid; gap: 2px; padding: 8px 12px; border-radius: 8px; background: var(--u-fill); border: 1px solid var(--u-line); }
+.cls__scores span { font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.cls__scores b { font-size: 15px; line-height: 20px; font-weight: 500; }
+.cls__note { display: flex; gap: 8px; margin-bottom: 10px; color: var(--u-ink); }
+.cls__note::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--ochre); flex: none; }
+.cls__where { margin-top: 4px; font-size: 12px; line-height: 16px; }
 .cls__topics { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .cls__topics legend { margin-bottom: 8px; }
-.cls__scope { display: flex; gap: var(--s-4); margin: 6px 0 0 24px; flex-wrap: wrap; }
-.cls__scope .check { font-size: var(--fs-sm); }
+.cls__scope { display: flex; gap: 16px; margin: 6px 0 0 24px; flex-wrap: wrap; }
+.cls__scope .check input { accent-color: var(--u-ink); }
 </style>

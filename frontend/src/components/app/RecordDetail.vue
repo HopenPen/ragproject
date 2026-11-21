@@ -111,17 +111,19 @@ async function remove () {
 </template>
 
 <style>
-.rdetail { display: flex; flex-direction: column; gap: 18px; padding: 4px 0 6px; }
-.rdetail h4 { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); margin-bottom: 8px; }
-.rdetail__big { font-size: 28px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
-.rdetail__what { margin-top: 4px; color: var(--ink-2); }
-.rdetail__raw { margin-top: 6px; font-size: var(--fs-sm); }
-.rdetail__note { margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
-.rdetail__where { margin-top: 6px; font-size: var(--fs-sm); }
+/* карточка записи: строки панели кита, разделённые линией; значение крупно, подписи тихие */
+.rdetail { display: flex; flex-direction: column; }
+.rdetail > section + section, .rdetail > p + section { margin-top: 14px; padding-top: 14px; box-shadow: inset 0 1px 0 var(--u-line); }
+.rdetail h4 { margin-bottom: 8px; font-size: 13px; line-height: 16px; font-weight: 400; color: var(--u-soft); }
+.rdetail__big { font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: -0.015em; }
+.rdetail__what { color: var(--u-text-2); }
+.rdetail__raw, .rdetail__note, .rdetail__where { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.rdetail__where { margin-top: 8px; }
 .rdetail__review { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.rdetail__missing { padding: 10px 12px; border-radius: var(--r-md); background: var(--danger-fill); color: var(--danger); font-size: var(--fs-sm); }
+.rdetail__missing { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2); color: var(--u-text-2); }
+.rdetail__missing::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
 .rdetail__issues { display: flex; flex-direction: column; gap: 8px; }
 .rdetail__issues h4 { margin-bottom: 0; }
-.rdetail__src .crop { margin-bottom: 10px; }
-.rdetail__actions { display: flex; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rdetail__src .crop { margin-bottom: 4px; }
+.rdetail__actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; box-shadow: inset 0 1px 0 var(--u-line); }
 </style>

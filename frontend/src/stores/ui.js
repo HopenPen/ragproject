@@ -19,7 +19,7 @@ function apply () {
   ui.theme = ui.themePref === 'system' ? (systemDark.matches ? 'dark' : 'light') : ui.themePref
   document.documentElement.dataset.theme = ui.theme
   const meta = document.querySelector('meta[name="theme-color"]:not([media])') || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color' }))
-  meta.content = ui.theme === 'dark' ? '#1C1C1B' : '#EAE6DE'
+  meta.content = ui.theme === 'dark' ? '#222222' : '#F1F1EF'
 }
 
 export function setTheme (pref) {

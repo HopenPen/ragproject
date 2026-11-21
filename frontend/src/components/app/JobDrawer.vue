@@ -80,9 +80,12 @@ function itemProgress (i) {
 </template>
 
 <style>
-.jd__sub { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: var(--fs-sm); }
-.jd__error { padding: 10px 12px; border-radius: var(--r-md); background: var(--danger-fill); color: var(--danger); }
-.jd__table td { vertical-align: top; padding-top: 11px; padding-bottom: 11px; }
+.jd__sub { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.jd__error { display: flex; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); color: var(--u-ink); }
+.jd__error::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
+.jd__table th { font-size: 12px; }
+.jd__table td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
+.jd__table b { font-weight: 500; }
 .jd__bar { margin-top: 6px; max-width: 220px; }
-.jd__item-error { margin-top: 4px; font-size: var(--fs-sm); color: var(--danger); }
+.jd__item-error { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-text-2); }
 </style>

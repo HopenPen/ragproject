@@ -23,20 +23,15 @@ const ICON = { ok: CircleCheck, error: CircleAlert, info: Info }
 </template>
 
 <style>
-.toaster { position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 80; display: flex; flex-direction: column; gap: var(--s-2); width: min(400px, calc(100vw - 32px)); }
-.toast { display: flex; align-items: flex-start; gap: var(--s-3); padding: 12px 10px 12px 14px; background: var(--ink); color: var(--bg); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); }
-.toast .btn--ghost { color: inherit; opacity: .7; }
-.toast .btn--ghost:hover { background: rgba(255, 255, 255, .1); opacity: 1; }
-[data-theme="dark"] .toast .btn--ghost:hover { background: rgba(0, 0, 0, .08); }
-.toast__icon { width: 18px; height: 18px; margin-top: 1px; flex: none; }
-.toast--ok .toast__icon { color: #5CCB95; }
-[data-theme="dark"] .toast--ok .toast__icon { color: var(--accent); }
-.toast--error .toast__icon { color: #F2897F; }
-[data-theme="dark"] .toast--error .toast__icon { color: var(--danger-line); }
+.toaster { position: fixed; right: 16px; bottom: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 32px)); }
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 10px 8px 10px 14px; background: var(--u-bg); color: var(--u-ink); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); }
+.toast__icon { width: 16px; height: 16px; margin-top: 2px; flex: none; color: var(--u-muted); }
+.toast--ok .toast__icon { color: var(--u-accent-text); }
+.toast--error .toast__icon { color: var(--danger); }
 .toast__text { flex: 1; min-width: 0; }
 .toast__title { font-weight: 500; }
-.toast__sub { font-size: var(--fs-sm); opacity: .75; margin-top: 2px; }
-.toast-enter-active, .toast-leave-active { transition: opacity .2s var(--ease), transform .2s var(--ease); }
+.toast__sub { font-size: 12px; line-height: 16px; color: var(--u-muted); margin-top: 2px; }
+.toast-enter-active, .toast-leave-active { transition: opacity 200ms var(--u-ease), transform 240ms var(--u-spring); }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(8px); }
 @media (max-width: 719px) { .toaster { right: 16px; bottom: calc(var(--tabbar-h) + 12px); } }
 </style>

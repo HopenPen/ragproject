@@ -9,13 +9,40 @@ import { ui } from '../../stores/ui.js'
 import { askReason } from '../../stores/dialogs.js'
 import { notify } from '../../stores/toasts.js'
 import { SEVERITY, ISSUE_STATUS, ruleLabel, profileShort } from '../../lib/labels.js'
-import { fmtDate } from '../../lib/format.js'
+import { fmtDate, fmtNum } from '../../lib/format.js'
 
 const props = defineProps({ issue: Object, editable: Boolean, showDoc: Boolean, compact: Boolean })
 const emit = defineEmits(['changed', 'open'])
 const busy = ref(false)
 const sev = computed(() => SEVERITY[props.issue.severity] || SEVERITY.warning)
 const st = computed(() => ISSUE_STATUS[props.issue.status] || ISSUE_STATUS.open)
+// пара чисел правила, как в карточке замечания на лендинге: значение из статьи и пересчёт.
+// Поля приходят из numbers (демо) или из details сервера (reported, calculated, voc, eg, relative_difference).
+const PAIRS = [
+  ['reported', 'calculated', 'PCE в статье', 'PCE по Voc, Jsc, FF', '%'],
+  ['jsc_jv', 'jsc_eqe', 'Jsc по J-V', 'Jsc по EQE', 'мА/см²'],
+  ['Voc', 'Eg', 'Voc', 'Eg/q', 'В'],
+  ['voc', 'eg', 'Voc', 'Eg/q', 'В']
+]
+const nums = computed(() => ({ ...props.issue, ...(props.issue.numbers || {}) }))
+const isNum = v => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v))
+// строка с сервера ('21.0') сохраняет свою точность, число из демо показывается не точнее сотых
+const pairNum = v => {
+  const d = typeof v === 'string' && v.includes('.') ? Math.min(3, v.split('.')[1].length) : null
+  return new Intl.NumberFormat('ru-RU', d === null ? { maximumFractionDigits: 2 } : { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(v))
+}
+const pair = computed(() => {
+  for (const [a, b, ka, kb, unit] of PAIRS) {
+    if (isNum(nums.value[a]) && isNum(nums.value[b])) return [{ k: ka, v: pairNum(nums.value[a]), unit }, { k: kb, v: pairNum(nums.value[b]), unit }]
+  }
+  return null
+})
+const delta = computed(() => {
+  const n = nums.value
+  const d = isNum(n.delta_pct) ? Number(n.delta_pct) : isNum(n.relative_difference) ? Number(n.relative_difference) * 100 : null
+  if (d === null) return ''
+  return `Расхождение ${fmtNum(d, 1)} %` + (isNum(n.threshold_pct) ? ` при допуске ${fmtNum(Number(n.threshold_pct), 1)} %` : '')
+})
 
 async function decide (status) {
   const reason = status === 'open' ? '' : await askReason({
@@ -37,12 +64,17 @@ async function decide (status) {
 <template>
   <article class="issue" :class="[`issue--${issue.severity}`, `issue--${issue.status}`, { 'issue--compact': compact }]">
     <header class="issue__head">
-      <Chip :tone="sev.tone" :text="sev.text" />
+      <span class="issue__dot" aria-hidden="true" />
       <h3 class="issue__rule"><button v-if="showDoc && ui.mobile" type="button" class="issue__link" @click="emit('open', issue)">{{ ruleLabel(issue.rule) }}</button><template v-else>{{ ruleLabel(issue.rule) }}</template></h3>
+      <span class="issue__sev">{{ sev.text }}</span>
       <Chip v-if="issue.status !== 'open'" :tone="st.tone" :text="st.text" />
     </header>
     <p class="issue__text">{{ issue.description }}</p>
-    <p class="issue__meta muted">
+    <div v-if="pair && !compact" class="issue__pair">
+      <div v-for="x in pair" :key="x.k" class="issue__rec"><span class="issue__k">{{ x.k }}</span><span class="issue__v num">{{ x.v }} {{ x.unit }}</span></div>
+    </div>
+    <p v-if="delta && !compact" class="issue__delta">{{ delta }}</p>
+    <p class="issue__meta">
       <template v-if="showDoc"><b>{{ issue.publication_code }}</b><template v-if="!ui.mobile">, {{ profileShort(issue.profile) }}</template>, </template>
       записи {{ issue.record_ids.join(', ') }}<template v-if="issue.source_page">, стр. {{ issue.source_page }}</template>
     </p>
@@ -65,23 +97,30 @@ async function decide (status) {
 </template>
 
 <style>
-.issue { padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--warn-line); border-radius: var(--r-md); background: var(--surface); }
-.issue--error { border-left-color: var(--danger-line); }
-.issue--info { border-left-color: var(--line-strong); }
-.issue--confirmed, .issue--dismissed { border-left-color: var(--line-strong); }
-.issue__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.issue__rule { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: 600; }
-.issue__text { margin-top: 8px; color: var(--ink-2); }
-.issue__meta { margin-top: 6px; font-size: var(--fs-sm); }
-.issue__meta b { color: var(--ink); font-weight: 600; }
-.issue__review { margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--line-strong); font-size: var(--fs-sm); color: var(--muted); }
+/* замечание как карточка проверки на лендинге: точка правила, текст, пара чисел и расхождение */
+.issue { padding: 14px 16px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; }
+.issue__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.issue__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ochre); flex: none; }
+.issue--error .issue__dot { background: var(--red); }
+.issue--info .issue__dot, .issue--dismissed .issue__dot { background: var(--u-soft); }
+.issue__rule { flex: 1; min-width: 0; font-size: 13px; line-height: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue__sev { flex: none; color: var(--u-soft); }
+.issue__text { margin-top: 6px; color: var(--u-text-2); }
+.issue__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 520px; margin-top: 10px; }
+.issue__rec { display: grid; gap: 2px; padding: 8px 12px; border-radius: 8px; background: var(--u-fill); border: 1px solid var(--u-line); }
+.issue__k { font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.issue__v { font-size: 15px; line-height: 20px; font-weight: 500; }
+.issue__delta { margin-top: 8px; font-weight: 500; }
+.issue__meta { margin-top: 8px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.issue__meta b { color: var(--u-ink); font-weight: 500; }
+.issue__review { margin-top: 8px; padding-left: 10px; box-shadow: inset 2px 0 0 var(--u-line-2); font-size: 12px; line-height: 16px; color: var(--u-muted); }
 .issue__actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-.issue__link { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.issue__link { padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--u-line-2); text-underline-offset: 3px; white-space: normal; }
 .issue--compact { padding: 10px 12px; }
+.issue--compact .issue__text { margin-top: 4px; font-size: 12px; line-height: 16px; }
+.issue--compact .issue__sev { display: none; }
 @media (max-width: 719px) {
+  .issue__rule { white-space: normal; }
   .issue__actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .issue__actions .btn--ghost { box-shadow: inset 0 0 0 1px var(--line-strong); }
 }
-.issue--compact .issue__rule { font-size: var(--fs-sm); }
-.issue--compact .issue__text { font-size: var(--fs-sm); margin-top: 6px; }
 </style>

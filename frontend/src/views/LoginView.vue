@@ -1,5 +1,5 @@
 <!-- Назначение файла: вход по почте и паролю (POST /auth/login). Регистрации нет, учётки выдаёт администратор.
-     Справа фрагмент таблицы статьи с числом в рамке источника: так в сервисе выглядит каждое извлечённое значение. -->
+     Справа страница статьи из UI-кита (как на лендинге): отмеченное значение и заметка с его источником. -->
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -14,7 +14,6 @@ const password = ref('')
 const error = ref(route.query.expired ? 'Сессия закончилась. Войдите снова.' : '')
 const busy = ref(false)
 const demo = API_MODE === 'mock'
-const cropUrl = import.meta.env.BASE_URL + 'brand/source-crop.svg'
 
 async function submit () {
   if (!email.value.trim() || !password.value) { error.value = 'Введите почту и пароль.'; return }
@@ -63,41 +62,51 @@ function demoLogin (who) {
       </div>
     </section>
     <section class="login__art" aria-hidden="true">
-      <figure class="login__sheet">
-        <img :src="cropUrl" alt="" width="1612" height="450">
-        <span class="login__paper" />
-        <svg class="login__annotation" viewBox="0 0 1612 450" aria-hidden="true">
-          <rect x="1378" y="282" width="88" height="52" rx="5" fill="#07854A" fill-opacity=".1" stroke="#07854A" stroke-width="4" />
-          <path d="M1422 334v28" stroke="#07854A" stroke-width="3" />
-          <rect x="1260" y="362" width="284" height="56" rx="6" fill="#07854A" />
-          <text x="1280" y="400" fill="white" font-size="30" font-weight="500" font-family="Geologica, sans-serif">PCE 21,4 %</text>
-        </svg>
-      </figure>
+      <div class="ui-doc login__doc">
+        <article class="ui-doc__page">
+          <div class="ui-doc__label">P103, стр. 5 из 14</div>
+          <div class="ui-doc__title">3.2 Photovoltaic performance</div>
+          <div class="ui-doc__text">The champion device reached a PCE of <mark class="ui-doc__mark is-on">21.4%</mark> under AM1.5G illumination at 100&nbsp;mW&nbsp;cm⁻², with V<sub>oc</sub> of 1.12&nbsp;V, J<sub>sc</sub> of 23.9&nbsp;mA&nbsp;cm⁻² and FF of 80.1% in the reverse scan.</div>
+          <div class="ui-doc__text">Across 24 devices of the same batch the mean PCE was <mark class="ui-doc__mark is-seen">20.3&nbsp;±&nbsp;0.6%</mark>.</div>
+          <div class="ui-doc__text">The forward scan gave <mark class="ui-doc__mark is-seen">19.8%</mark>, indicating weak hysteresis.</div>
+          <div class="ui-doc__text">The active area of 0.09&nbsp;cm² was defined by a metal aperture mask.</div>
+        </article>
+        <aside class="ui-doc__note ui-panel is-on">
+          <div class="ui-doc__kind"><span class="ui-doc__dot" />Источник</div>
+          <div class="ui-doc__msg">PCE 21,4 %, прибор D2, лучший, обратный ход</div>
+          <div class="ui-doc__where">Стр. 5, раздел 3.2, уверенность 0,94</div>
+        </aside>
+      </div>
       <p class="login__caption">Каждое значение в базе ведёт к своему месту в статье: странице, таблице и строке.</p>
     </section>
   </div>
 </template>
 
 <style>
-.login { min-height: 100vh; display: grid; grid-template-columns: minmax(360px, 460px) 1fr; }
-.login__form { display: flex; flex-direction: column; justify-content: center; padding: var(--s-10) clamp(24px, 5vw, 64px); background: var(--surface); border-right: 1px solid var(--line); }
-.login__brand { display: flex; align-items: center; gap: 10px; margin-bottom: 56px; font-weight: 600; }
-.login h1 { font-size: var(--fs-2xl); margin-bottom: 6px; }
-.login__fields { margin-top: var(--s-6); gap: var(--s-4); }
-.login__fields .btn { margin-top: var(--s-2); }
-.login__demo { margin-top: var(--s-8); padding-top: var(--s-5); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
+.login { min-height: 100vh; display: grid; grid-template-columns: minmax(360px, 440px) 1fr; }
+.login__form { display: flex; flex-direction: column; justify-content: center; padding: 40px clamp(24px, 5vw, 56px); box-shadow: inset -1px 0 0 var(--u-line); }
+.login__brand { display: flex; align-items: center; gap: 10px; margin-bottom: 48px; font-weight: 500; }
+.login h1 { font-size: 24px; line-height: 32px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 4px; }
+.login__fields { margin-top: 24px; gap: 14px; }
+.login__fields .btn { margin-top: 6px; }
+.login__demo { margin-top: 32px; padding-top: 18px; box-shadow: inset 0 1px 0 var(--u-line); color: var(--u-muted); }
 .login__demo p { margin-bottom: 10px; }
-.login__demo b { color: var(--ink); font-weight: 600; }
-.login__art { display: flex; flex-direction: column; justify-content: center; gap: var(--s-5); padding: var(--s-10) clamp(32px, 6vw, 96px); overflow: hidden; }
-.login__sheet { position: relative; margin: 0; width: min(100%, 860px); background: #fff; box-shadow: var(--shadow-page); border-radius: 3px; }
-.login__sheet img { width: 100%; height: auto; border-radius: 3px; }
-.login__paper { position: absolute; inset: 0; background: var(--paper); mix-blend-mode: multiply; border-radius: 3px; }
-.login__annotation { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.login__caption { max-width: 46ch; color: var(--muted); font-size: var(--fs-lg); line-height: 1.5; }
+.login__demo b { color: var(--u-ink); font-weight: 500; }
+.login__art { display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 40px clamp(32px, 6vw, 96px); background: var(--fx-surface); overflow: hidden; }
+/* страница статьи на бумаге, заметка с источником в поле справа, как в окне продукта на лендинге */
+.login__doc { width: min(100%, 680px); padding-right: 216px; }
+.login__doc .ui-doc__page { border-radius: 10px; border: 1px solid rgb(0 0 0 / .08); background: var(--paper); color: #24231F; box-shadow: 0 1px 2px rgb(0 0 0 / .10), 0 18px 40px -18px rgb(0 0 0 / .35); }
+.login__doc .ui-doc__label { color: #6C6A62; }
+.login__doc .ui-doc__text { color: #34332D; }
+.login__doc .ui-doc__mark { --u-tint-2: rgb(7 133 74 / .2); }
+.login__doc .ui-doc__mark.is-on { box-shadow: inset 0 -1.5px 0 #07854A; }
+.login__doc .ui-doc__mark.is-seen { box-shadow: inset 0 -1px 0 rgb(36 35 31 / .45); }
+.login__doc .ui-doc__note { top: 92px; width: 200px; }
+.login__caption { max-width: 46ch; color: var(--u-text-2); font-size: 15px; line-height: 22px; }
+@media (max-width: 1180px) { .login__doc { padding-right: 0; } .login__doc .ui-doc__note { position: relative; top: 0; margin: -24px 0 0 auto; } }
 @media (max-width: 900px) {
   .login { grid-template-columns: 1fr; }
   .login__art { display: none; }
-  .login__form { border-right: 0; justify-content: flex-start; padding-top: 48px; }
-  .login__brand { margin-bottom: 40px; }
+  .login__form { box-shadow: none; justify-content: flex-start; padding-top: 48px; }
 }
 </style>

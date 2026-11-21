@@ -75,8 +75,8 @@ onMounted(() => kickJobs())
         <h2>Новая выгрузка</h2>
         <fieldset class="exp__set">
           <legend class="field__label">Профили</legend>
-          <label class="check"><input v-model="profiles" type="checkbox" value="solar-v1">Солнечные элементы</label>
-          <label class="check"><input v-model="profiles" type="checkbox" value="rag-v1">RAG-системы</label>
+          <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="solar-v1">Солнечные элементы</label>
+          <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="rag-v1">RAG-системы</label>
         </fieldset>
         <fieldset class="exp__set">
           <legend class="field__label">Режим</legend>
@@ -85,10 +85,10 @@ onMounted(() => kickJobs())
         </fieldset>
         <fieldset class="exp__set">
           <legend class="field__label">Проверки перед сборкой</legend>
-          <label class="check"><input v-model="checkSources" type="checkbox">Сверить источники значений</label>
-          <label class="check" :class="{ 'is-off': !profiles.includes('solar-v1') }"><input v-model="checker" type="checkbox" :disabled="!profiles.includes('solar-v1')">Внешний checker для solar</label>
+          <label class="check"><input v-model="checkSources" type="checkbox" class="cb">Сверить источники значений</label>
+          <label class="check" :class="{ 'is-off': !profiles.includes('solar-v1') }"><input v-model="checker" type="checkbox" class="cb" :disabled="!profiles.includes('solar-v1')">Внешний checker для solar</label>
         </fieldset>
-        <button class="btn btn--primary btn--block" type="button" :disabled="busy || !editable || !profiles.length" @click="create()"><PackageCheck />Собрать выгрузку</button>
+        <button class="btn btn--accent btn--block btn--lg" type="button" :disabled="busy || !editable || !profiles.length" @click="create()"><PackageCheck />Собрать выгрузку</button>
         <p v-if="!editable" class="field__hint">Собирать выгрузку может редактор корпуса.</p>
       </section>
 
@@ -109,12 +109,16 @@ onMounted(() => kickJobs())
           <template v-else-if="j.status === 'succeeded'">
             <p class="exp__meta muted"><span class="mono">{{ j.result.file_name }}</span>, {{ fmtBytes(j.result.size_bytes) }}, {{ countText(j.result.documents, ['статья', 'статьи', 'статей']) }} с данными</p>
             <p v-if="j.result.gaps?.length" class="exp__gaps">Пропуски ({{ j.result.gaps.length }}): {{ j.result.gaps.map(g => `${g.publication_code}, ${g.reason}`).join('; ') }}</p>
-            <div class="exp__tree">
-              <ul v-for="g in treeOf(j)" :key="g.dir" class="exp__dir">
-                <li v-if="g.dir" class="exp__dirname mono">{{ g.dir }}</li>
-                <li v-for="f in g.files" :key="f" class="mono" :class="{ 'exp__in': g.dir }">{{ f }}</li>
-              </ul>
-            </div>
+            <ul class="ui-files__grid exp__files">
+              <template v-for="g in treeOf(j)" :key="g.dir">
+                <li v-for="f in g.files" :key="g.dir + f" class="ui-file is-done" :title="g.dir ? `${g.dir}/${f}` : f">
+                  <span class="ui-file__icon"><svg class="ui-file__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.25 2.75h8L18.75 7.25v14H6.25z" /><path d="M14 2.75v4.75h4.75M9 12.5h6.5M9 15.5h6.5M9 18.5h4" /></svg></span>
+                  <span class="ui-file__name">{{ f }}</span>
+                  <span class="ui-file__kind">{{ g.dir ? g.dir.split('/')[0] : f.split('.').pop().toUpperCase() }}</span>
+                  <span class="ui-file__check"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                </li>
+              </template>
+            </ul>
             <div class="exp__actions">
               <button class="btn btn--primary btn--sm" type="button" @click="download(j)"><Download />Скачать ZIP</button>
               <button class="btn btn--sm" type="button" @click="show(j, 'passport')"><FileJson />Паспорт данных</button>
@@ -164,39 +168,49 @@ onMounted(() => kickJobs())
 </template>
 
 <style>
-.exp__grid { display: grid; grid-template-columns: 380px 1fr; gap: var(--s-6); align-items: start; }
-.exp h2 { font-size: var(--fs-lg); margin-bottom: var(--s-4); }
-.exp__form { padding: var(--s-5); position: sticky; top: calc(var(--header-h) + 16px); }
-.exp__set { border: 0; margin: 0 0 var(--s-5); padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.exp__set legend { margin-bottom: 8px; }
-.exp__mode { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); cursor: pointer; }
-.exp__mode.is-on { border-color: var(--accent); background: var(--accent-soft); }
-.exp__mode input { margin-top: 3px; accent-color: var(--accent); }
+.exp__grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 24px; align-items: start; }
+.exp h2 { font-size: 13px; line-height: 20px; font-weight: 500; margin-bottom: 12px; }
+.exp__form { padding: 16px; position: sticky; top: calc(var(--header-h) + 20px); }
+.exp__set { border: 0; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.exp__set legend { margin-bottom: 8px; color: var(--u-soft); font-weight: 400; }
+.exp__mode { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--u-line-2); transition: box-shadow 160ms var(--u-ease), background-color 160ms var(--u-ease); }
+.exp__mode:hover { background: var(--u-fill); }
+.exp__mode.is-on { background: var(--u-fill); box-shadow: inset 0 0 0 1.5px var(--u-ink); }
+.exp__mode input { margin-top: 3px; accent-color: var(--u-ink); }
 .exp__mode > span { display: flex; flex-direction: column; gap: 2px; }
-.exp__mode .muted { font-size: var(--fs-sm); }
-.check.is-off { opacity: .55; }
-.exp__list { display: flex; flex-direction: column; gap: 12px; }
-.exp__list h2 { margin-bottom: 4px; }
-.exp__job { padding: 16px 18px; }
+.exp__mode b { font-weight: 500; }
+.exp__mode .muted { font-size: 12px; line-height: 16px; }
+.check.is-off { opacity: .5; }
+.exp__list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.exp__list h2 { margin-bottom: 0; }
+.exp__job { padding: 14px 16px 16px; }
 .exp__jhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.exp__jhead .muted { font-size: var(--fs-sm); }
-.exp__run { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); }
-.exp__meta { margin-top: 8px; font-size: var(--fs-sm); }
-.exp__gaps { margin-top: 6px; font-size: var(--fs-sm); color: var(--warn); }
-.exp__tree { display: flex; flex-wrap: wrap; gap: 6px 32px; margin-top: 10px; padding: 10px 14px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); font-size: var(--fs-sm); }
-.exp__dir li { line-height: 1.7; }
-.exp__dirname { color: var(--muted); }
-.exp__in { padding-left: 14px; }
-.exp__actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-.exp__err { margin-top: 10px; color: var(--danger); }
-.exp__blockers { margin-top: 6px; font-size: var(--fs-sm); }
-.exp__blockers li { padding: 3px 0; }
+.exp__jhead b { font-weight: 500; }
+.exp__jhead .muted { color: var(--u-soft); }
+.exp__run { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.exp__meta { margin-top: 6px; font-size: 12px; line-height: 16px; }
+.exp__gaps { display: flex; gap: 8px; margin-top: 8px; color: var(--u-text-2); font-size: 12px; line-height: 16px; }
+.exp__gaps::before { content: ""; width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: var(--ochre); flex: none; }
+.exp__files { margin-top: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.exp__files .ui-file { height: 96px; padding: 12px 8px 0; box-shadow: none; }
+.exp__files .ui-file__icon { width: 32px; height: 32px; margin-bottom: 8px; border-radius: 8px; }
+.exp__files .ui-file__glyph { width: 20px; height: 20px; }
+.exp__files .ui-file__name { font-size: 12px; }
+.exp__files .ui-file__kind { font-size: 12px; color: var(--u-soft); }
+.exp__files .ui-file__check { top: 6px; right: 6px; width: 16px; height: 16px; }
+.exp__actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+.exp__err { display: flex; gap: 8px; margin-top: 10px; color: var(--u-ink); }
+.exp__err::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
+.exp__blockers { margin-top: 6px; padding-left: 14px; color: var(--u-text-2); }
+.exp__blockers li { padding: 2px 0; }
+.exp__blockers b { font-weight: 500; }
 .pass { margin-bottom: 22px; }
-.pass h3 { font-size: var(--fs-md); margin-bottom: 8px; font-weight: 600; }
-.pass__table td, .pass__table th { height: 32px; font-size: var(--fs-sm); }
+.pass h3 { font-size: 13px; margin-bottom: 8px; font-weight: 500; }
+.pass h3 .faint { font-weight: 400; }
+.pass__table td, .pass__table th { height: 32px; font-size: 12px; }
 .rep { margin-bottom: 18px; }
-.rep__h { font-size: var(--fs-md); margin: 6px 0 8px; }
-.rep__rules li { display: grid; grid-template-columns: 1fr auto 40px; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--fs-sm); }
-.rep__rules b { text-align: right; }
+.rep__h { font-size: 13px; font-weight: 500; margin: 6px 0 8px; }
+.rep__rules li { display: grid; grid-template-columns: 1fr auto 40px; gap: 12px; padding: 8px 0; box-shadow: inset 0 1px 0 var(--u-line); }
+.rep__rules b { text-align: right; font-weight: 500; }
 @media (max-width: 1100px) { .exp__grid { grid-template-columns: 1fr; } .exp__form { position: static; } }
 </style>

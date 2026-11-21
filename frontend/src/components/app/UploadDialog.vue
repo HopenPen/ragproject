@@ -105,29 +105,30 @@ function retryRow (r) { r.state = 'ready'; r.message = ''; r.progress = 0 }
 
     <template #footer>
       <button class="btn" type="button" @click="emit('close')">{{ uploaded.length ? 'Готово' : 'Отмена' }}</button>
-      <button v-if="uploaded.length && !rows.some(r => r.state === 'ready')" class="btn btn--primary" type="button" :disabled="busy" @click="processUploaded">Обработать загруженные ({{ uploaded.length }})</button>
+      <button v-if="uploaded.length && !rows.some(r => r.state === 'ready')" class="btn btn--accent" type="button" :disabled="busy" @click="processUploaded">Обработать загруженные ({{ uploaded.length }})</button>
       <button v-else class="btn btn--primary" type="button" :disabled="busy || !rows.some(r => r.state === 'ready')" @click="start">Загрузить {{ rows.filter(r => r.state === 'ready').length || '' }}</button>
     </template>
   </Modal>
 </template>
 
 <style>
-.drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 20px; border: 1.5px dashed var(--line-strong); border-radius: var(--r-lg); background: var(--surface-2); text-align: center; cursor: pointer; transition: border-color .15s var(--ease), background-color .15s var(--ease); }
-.drop:hover, .drop.is-over { border-color: var(--accent); background: var(--accent-soft); }
-.drop svg { width: 24px; height: 24px; color: var(--muted); margin-bottom: 4px; }
-.drop b { font-weight: 600; }
-.drop .faint { font-size: var(--fs-sm); }
-.uprows { margin-top: var(--s-4); display: flex; flex-direction: column; }
-.uprow { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
-.uprow:last-child { border-bottom: 0; }
-.uprow__icon { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 20px; border: 1px dashed color-mix(in oklab, var(--u-ink) 28%, transparent); border-radius: 12px; background: var(--u-fill); text-align: center; transition: border-color 160ms var(--u-ease), background-color 160ms var(--u-ease); }
+.drop:hover, .drop.is-over { border-color: var(--u-accent); background: var(--u-tint); }
+.drop svg { width: 20px; height: 20px; color: var(--u-muted); margin-bottom: 6px; }
+.drop b { font-weight: 500; }
+.drop .faint { font-size: 12px; line-height: 16px; }
+.uprows { margin-top: 12px; display: flex; flex-direction: column; }
+.uprow { display: flex; align-items: center; gap: 12px; padding: 10px 2px; }
+.uprow + .uprow { box-shadow: inset 0 1px 0 var(--u-line); }
+.uprow__icon { width: 16px; height: 16px; color: var(--u-muted); flex: none; }
 .uprow__main { flex: 1; min-width: 0; }
+.uprow__main b { font-weight: 500; }
 .uprow__bar { margin-top: 6px; }
-.uprow__msg { margin-top: 2px; font-size: var(--fs-sm); color: var(--muted); }
+.uprow__msg { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
 .uprow--failed .uprow__msg, .uprow--error .uprow__msg, .uprow--ready .uprow__msg { color: var(--danger); }
 .uprow__code { width: 92px; flex: none; }
 .uprow__state { display: flex; align-items: center; gap: 4px; min-width: 24px; }
-.uprow__state svg { width: 18px; height: 18px; }
-.uprow__state .ok { color: var(--accent-text); }
+.uprow__state svg { width: 16px; height: 16px; }
+.uprow__state .ok { color: var(--u-accent-text); }
 .uprow__state .bad { color: var(--danger); }
 </style>

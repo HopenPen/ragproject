@@ -143,7 +143,8 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
 .eform__wide { grid-column: 1 / -1; }
 .eform__req { color: var(--danger); margin-left: 2px; }
 .eform__more { margin-top: 16px; }
-.eform__more summary { cursor: pointer; color: var(--accent-text); font-weight: 500; margin-bottom: 12px; }
-.eform__reason { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.eform__more summary { color: var(--u-text-2); font-weight: 500; margin-bottom: 12px; }
+.eform__more summary:hover { color: var(--u-ink); }
+.eform__reason { margin-top: 18px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--u-line); }
 @media (max-width: 719px) { .eform__grid { grid-template-columns: 1fr; } }
 </style>

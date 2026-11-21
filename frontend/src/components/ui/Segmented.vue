@@ -11,10 +11,11 @@ const emit = defineEmits(['update:modelValue'])
   </div>
 </template>
 <style>
-.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-sunk); border-radius: var(--r-md); }
-.seg__opt { height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; white-space: nowrap; }
-.seg__opt:hover { color: var(--ink); }
-.seg__opt.is-on { background: var(--surface-2); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
-.seg__count { margin-left: 6px; color: var(--faint); }
-.seg--sm .seg__opt { height: 24px; padding: 0 9px; font-size: var(--fs-xs); }
+.seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.seg__opt { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 99px; background: transparent; color: var(--u-muted); font-size: 13px; font-weight: 400; white-space: nowrap; transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease); }
+.seg__opt:hover { color: var(--u-ink); background: var(--u-fill); }
+.seg__opt.is-on { background: var(--u-fill-2); color: var(--u-ink); font-weight: 500; }
+.seg__count { color: var(--u-soft); font-variant-numeric: tabular-nums; }
+.seg__opt.is-on .seg__count { color: var(--u-muted); }
+.seg--sm .seg__opt { height: 24px; padding: 0 9px; }
 </style>

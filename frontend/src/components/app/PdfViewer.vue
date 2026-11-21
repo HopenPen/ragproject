@@ -171,27 +171,29 @@ defineExpose({ scrollToFocus })
 </template>
 
 <style>
-.pdfv { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--surface-sunk); }
-.pdfv__bar { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 10px 0 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.pdfv__page, .pdfv__zoom { font-size: var(--fs-sm); color: var(--muted); }
-.pdfv__zoom { min-width: 42px; text-align: center; }
-.pdfv__sel { display: inline-flex; align-items: center; gap: 8px; margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pdfv__selbox { width: 14px; height: 10px; border-radius: 2px; box-shadow: 0 0 0 2px #07854A; background: rgba(7, 133, 74, .12); }
+/* страница PDF на подложке окна; рамка выбранного числа как отметка на странице в макете лендинга */
+.pdfv { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--u-fill-2); }
+.pdfv__bar { display: flex; align-items: center; gap: 4px; height: 40px; flex: none; padding: 0 8px 0 14px; background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
+.pdfv__page, .pdfv__zoom { color: var(--u-muted); }
+.pdfv__zoom { min-width: 44px; text-align: center; }
+.pdfv__sel { display: inline-flex; align-items: center; gap: 8px; min-width: 0; margin-left: 12px; padding-left: 12px; box-shadow: inset 1px 0 0 var(--u-line-2); font-weight: 500; color: var(--u-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdfv__selbox { width: 14px; height: 10px; flex: none; border-radius: 2px; box-shadow: 0 0 0 1.5px #07854A; background: rgb(7 133 74 / .14); }
 .pdfv__scroll { flex: 1; overflow: auto; position: relative; overscroll-behavior: contain; }
-.pdfv__pages { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; min-width: min-content; }
-.pdfv__sheet { position: relative; flex: none; background: #fff; box-shadow: var(--shadow-page); border-radius: 2px; }
-.pdfv__sheet canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 2px; }
-.pdfv__paper { position: absolute; inset: 0; background: var(--paper); mix-blend-mode: multiply; pointer-events: none; border-radius: 2px; }
-.pdfv__error { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 420px; margin: 80px auto; padding: 0 24px; text-align: center; color: var(--muted); }
-.pdfv__error svg { width: 28px; height: 28px; color: var(--danger); }
+.pdfv__pages { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; min-width: min-content; }
+.pdfv__sheet { position: relative; flex: none; background: #fff; border-radius: 3px; box-shadow: 0 1px 2px rgb(0 0 0 / .10), 0 18px 40px -18px rgb(0 0 0 / .35); }
+.pdfv__sheet canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 3px; }
+.pdfv__paper { position: absolute; inset: 0; background: var(--paper); mix-blend-mode: multiply; pointer-events: none; border-radius: 3px; }
+.pdfv__error { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 420px; margin: 80px auto; padding: 0 24px; text-align: center; color: var(--u-muted); }
+.pdfv__error svg { width: 24px; height: 24px; color: var(--danger); }
 
-.pin { position: absolute; padding: 0; margin: 0; border: 0; background: transparent; border-radius: 3px; cursor: pointer; transform: scale(1.06); }
-.pin--idle { box-shadow: inset 0 0 0 1px rgba(7, 133, 74, .0); }
-.pin--idle:hover { box-shadow: 0 0 0 1.5px rgba(7, 133, 74, .55); background: rgba(7, 133, 74, .06); }
-.pdfv__sheet:hover .pin--idle { box-shadow: 0 0 0 1px rgba(7, 133, 74, .28); }
-.pin--warn { box-shadow: 0 0 0 1.5px rgba(201, 138, 46, .85); background: rgba(201, 138, 46, .08); }
-.pin--error { box-shadow: 0 0 0 1.5px rgba(168, 38, 29, .8); background: rgba(168, 38, 29, .07); }
-.pin.is-active { z-index: 2; box-shadow: 0 0 0 2.5px #07854A, 0 0 0 6px rgba(7, 133, 74, .18); background: rgba(7, 133, 74, .1); animation: pin-in .5s var(--ease); }
-.pin.is-active.pin--warn { box-shadow: 0 0 0 2.5px #B26F0E, 0 0 0 6px rgba(201, 138, 46, .22); background: rgba(201, 138, 46, .12); }
-@keyframes pin-in { from { box-shadow: 0 0 0 14px rgba(7, 133, 74, 0), 0 0 0 0 rgba(7, 133, 74, 0); } }
+.pin { position: absolute; padding: 0; margin: 0; border: 0; background: transparent; border-radius: 3px; transform: scale(1.08); transition: box-shadow 200ms var(--u-ease), background-color 200ms var(--u-ease); }
+.pdfv__sheet:hover .pin--idle { box-shadow: 0 0 0 1px rgb(7 133 74 / .35); }
+.pin--idle:hover { box-shadow: 0 0 0 1.5px rgb(7 133 74 / .7) !important; background: rgb(7 133 74 / .08); }
+.pin--warn { box-shadow: 0 0 0 1.5px rgb(183 121 31 / .9); background: rgb(183 121 31 / .08); }
+.pin--error { box-shadow: 0 0 0 1.5px rgb(196 67 47 / .85); background: rgb(196 67 47 / .07); }
+.pin.is-active { z-index: 2; box-shadow: 0 0 0 2px #07854A; background: rgb(7 133 74 / .12); animation: pin-in 420ms var(--u-spring); }
+.pin.is-active.pin--warn { box-shadow: 0 0 0 2px #B7791F; background: rgb(183 121 31 / .14); }
+.pin.is-active.pin--error { box-shadow: 0 0 0 2px #C4432F; background: rgb(196 67 47 / .12); }
+@keyframes pin-in { from { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pin.is-active { animation: none; } }
 </style>

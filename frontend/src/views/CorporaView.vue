@@ -43,44 +43,37 @@ async function create () {
 
 <template>
   <div class="shell">
-    <header class="top">
-      <span class="top__brand"><BrandMark /><span>Science Extract</span></span>
+    <header class="shell__bar">
+      <span class="shell__brand"><BrandMark /><span>Science Extract</span></span>
       <span class="grow" />
       <UserMenu />
     </header>
     <main class="page corpora">
       <div class="page__head">
-        <h1 class="page__title">Корпуса</h1>
+        <h1 class="page__title">Корпуса<span v-if="ws.corpora.length" class="count">{{ ws.corpora.length }}</span></h1>
         <span class="grow" />
-        <button v-if="canCreate" class="btn btn--primary" type="button" @click="createOpen = true; fieldError = ''"><Plus />Новый корпус</button>
+        <button v-if="canCreate" class="btn btn--accent" type="button" @click="createOpen = true; fieldError = ''"><Plus />Новый корпус</button>
       </div>
-      <div v-if="loading" class="stack"><div v-for="i in 2" :key="i" class="skeleton" style="height: 88px" /></div>
+      <div v-if="loading" class="panel"><div v-for="i in 3" :key="i" class="skeleton" style="height: 20px; margin: 18px 16px" /></div>
       <div v-else-if="!ws.corpora.length" class="panel empty">
         <h3>Корпусов пока нет</h3>
         <p>Корпус объединяет статьи одной задачи: например, dev-набор для настройки или тестовый набор для сдачи.</p>
-        <button v-if="canCreate" class="btn btn--primary" type="button" @click="createOpen = true">Создать корпус</button>
+        <button v-if="canCreate" class="btn btn--accent" type="button" @click="createOpen = true">Создать корпус</button>
       </div>
-      <ul v-else class="corpora__list">
-        <li v-for="c in ws.corpora" :key="c.id">
-          <RouterLink :to="`/corpora/${c.id}/documents`" class="corpora__item panel">
-            <div class="corpora__main">
-              <h2>{{ c.name }}</h2>
-              <p v-if="c.description" class="muted">{{ c.description }}</p>
-            </div>
-            <dl class="corpora__stats">
-              <div><dt>Статьи</dt><dd class="num">{{ c.stats?.documents ?? 0 }}</dd></div>
-              <div><dt>Записи</dt><dd class="num">{{ c.stats?.records ?? 0 }}</dd></div>
-              <div><dt>Замечания</dt><dd class="num" :class="{ 'is-warn': c.stats?.issues_open }">{{ c.stats?.issues_open ?? 0 }}</dd></div>
-            </dl>
-            <div class="corpora__side">
-              <span class="chip chip--plain">{{ c.split }}</span>
-              <span v-if="c.status === 'archived'" class="chip chip--off"><Archive style="width: 12px; height: 12px" />в архиве</span>
-              <span class="faint">изменён {{ fmtDate(c.updated_at) }}</span>
-            </div>
-          </RouterLink>
-        </li>
-      </ul>
-      <p v-if="ws.corpora.length" class="faint corpora__note">{{ countText(ws.corpora.length, ['корпус', 'корпуса', 'корпусов']) }} доступно вам.</p>
+      <div v-else class="panel corpora__list">
+        <div class="corpora__cols" aria-hidden="true"><span>Корпус</span><span class="t-r">Статьи</span><span class="t-r">Записи</span><span class="t-r">Замечания</span><span>Набор</span><span class="t-r">Изменён</span></div>
+        <RouterLink v-for="c in ws.corpora" :key="c.id" :to="`/corpora/${c.id}/documents`" class="corpora__row">
+          <span class="corpora__main">
+            <span class="corpora__name">{{ c.name }}<span v-if="c.status === 'archived'" class="chip chip--off corpora__arch"><Archive style="width: 12px; height: 12px" />в архиве</span></span>
+            <span v-if="c.description" class="corpora__desc">{{ c.description }}</span>
+          </span>
+          <span class="corpora__n num" data-label="Статьи">{{ c.stats?.documents ?? 0 }}</span>
+          <span class="corpora__n num" data-label="Записи">{{ c.stats?.records ?? 0 }}</span>
+          <span class="corpora__n" data-label="Замечания"><span v-if="c.stats?.issues_open" class="count count--warn">{{ c.stats.issues_open }}</span><span v-else class="num">0</span></span>
+          <span class="corpora__split"><span class="chip chip--plain">{{ c.split }}</span></span>
+          <span class="corpora__age">{{ fmtDate(c.updated_at) }}</span>
+        </RouterLink>
+      </div>
     </main>
 
     <Modal :open="createOpen" title="Новый корпус" @close="createOpen = false">
@@ -105,27 +98,35 @@ async function create () {
       </form>
       <template #footer>
         <button class="btn" type="button" @click="createOpen = false">Отмена</button>
-        <button class="btn btn--primary" type="submit" form="corpus-form" :disabled="busy">Создать корпус</button>
+        <button class="btn btn--accent" type="submit" form="corpus-form" :disabled="busy">Создать корпус</button>
       </template>
     </Modal>
   </div>
 </template>
 
 <style>
-.corpora { max-width: 980px; }
-.corpora__list { display: flex; flex-direction: column; gap: var(--s-3); }
-.corpora__item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--s-6); padding: var(--s-5) var(--s-6); color: var(--ink); transition: border-color .15s var(--ease); }
-.corpora__item:hover { text-decoration: none; border-color: var(--line-strong); }
-.corpora__main h2 { font-size: var(--fs-lg); margin-bottom: 4px; }
-.corpora__stats { display: flex; gap: var(--s-6); margin: 0; }
-.corpora__stats div { min-width: 64px; }
-.corpora__stats dt { font-size: var(--fs-xs); color: var(--muted); }
-.corpora__stats dd { margin: 2px 0 0; font-size: var(--fs-xl); font-weight: 500; }
-.corpora__stats dd.is-warn { color: var(--warn); }
-.corpora__side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: var(--fs-sm); }
-.corpora__note { margin-top: var(--s-4); font-size: var(--fs-sm); }
+.corpora { max-width: 1080px; }
+.corpora__list { overflow: hidden; }
+.corpora__cols, .corpora__row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px 88px 72px 120px; align-items: center; gap: 0 16px; padding: 0 16px; }
+.corpora__cols { height: 34px; color: var(--u-soft); background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
+.corpora__cols .t-r { text-align: right; }
+.corpora__row { min-height: 60px; padding-top: 10px; padding-bottom: 10px; color: var(--u-ink); text-decoration: none !important; transition: background-color 160ms var(--u-ease); }
+.corpora__row + .corpora__row { box-shadow: inset 0 1px 0 var(--u-line); }
+.corpora__row:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
+.corpora__main { display: flex; flex-direction: column; min-width: 0; }
+.corpora__name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.corpora__arch { height: 20px; font-size: 12px; }
+.corpora__desc { color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.corpora__n { text-align: right; color: var(--u-text-2); }
+.corpora__age { text-align: right; color: var(--u-soft); white-space: nowrap; }
 @media (max-width: 719px) {
-  .corpora__item { grid-template-columns: 1fr; gap: var(--s-3); padding: var(--s-4); }
-  .corpora__side { flex-direction: row; align-items: center; }
+  .corpora__cols { display: none; }
+  .corpora__row { grid-template-columns: repeat(3, auto) 1fr; grid-template-rows: auto auto; gap: 8px 16px; padding: 12px 14px; }
+  .corpora__main { grid-column: 1 / 5; }
+  .corpora__desc { white-space: normal; }
+  .corpora__n { text-align: left; display: flex; flex-direction: column; font-size: 13px; }
+  .corpora__n::before { content: attr(data-label); font-size: 12px; line-height: 16px; color: var(--u-soft); }
+  .corpora__split { justify-self: end; align-self: end; }
+  .corpora__age { display: none; }
 }
 </style>
