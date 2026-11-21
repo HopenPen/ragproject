@@ -17,7 +17,9 @@ def configuration(identity=Depends(actor), rt=Depends(runtime)):
 
 @router.get('/corpora/{id}/jobs')
 def jobs(id: str, identity=Depends(actor), pagination=Depends(paging), rt=Depends(runtime)):
-    return public_record(paginate(rt.catalog.related(identity, 'corpora', id, 'jobs'), **pagination))
+    result = paginate(rt.catalog.related(identity, 'corpora', id, 'jobs'), **pagination)
+    result['items'] = [rt.catalog.job_details(identity, job['id']) for job in result['items']]
+    return public_record(result)
 
 
 def accepted(job, response):

@@ -21,6 +21,8 @@ from app.services.auth import AuthService
 from app.services.catalog import Catalog, Documents
 from app.services.pipeline import Jobs
 from app.routes import auth, documents, jobs, catalog, health
+from app.frontend import FrontendFiles
+from pathlib import Path
 
 counters = {'requests': 0, 'errors': 0}
 log = logging.getLogger('science_extract')
@@ -127,6 +129,8 @@ def create_app(config=None, runtime=None):
             return app.openapi_schema
         from app.profiles import GRAPHS
         app.openapi = openapi
+        if Path('/frontend/index.html').is_file():
+            app.mount('/frontend', FrontendFiles(directory='/frontend', html=True), name='frontend')
     else:
         raise ValueError('APP_MODE must be auth or backend')
     return app

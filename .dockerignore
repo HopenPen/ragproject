@@ -21,3 +21,7 @@ minio-digest.txt
 *.zip
 *.dump
 *.sqlite*
+**/node_modules
+frontend/dist
+frontend/public/pdfjs
+frontend/src/styles/fonts.css

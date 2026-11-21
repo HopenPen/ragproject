@@ -19,7 +19,7 @@ def create_corpus(body: CorpusCreate, identity=Depends(actor), rt=Depends(runtim
 
 @router.get('/corpora/{id}')
 def corpus(id: str, identity=Depends(actor), rt=Depends(runtime)):
-    return rt.catalog.get(identity, 'corpora', id)
+    return rt.documents.corpus_details(identity, id)
 
 
 @router.patch('/corpora/{id}')

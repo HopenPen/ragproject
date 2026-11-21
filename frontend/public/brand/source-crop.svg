@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1612 450">
+  <rect width="1612" height="450" fill="#fff"/>
+  <g font-family="Georgia,serif" fill="#24251f">
+    <text x="64" y="70" font-size="32" font-weight="bold">Table 2. Photovoltaic performance of thin-film solar cells</text>
+    <path d="M64 100H1548M64 175H1548M64 365H1548" stroke="#282923" stroke-width="2"/>
+    <g font-size="30"><text x="80" y="148">Device</text><text x="500" y="148">Voc (V)</text><text x="780" y="148">Jsc (mA/cm²)</text><text x="1140" y="148">FF (%)</text><text x="1390" y="148">PCE (%)</text></g>
+    <g font-size="32"><text x="80" y="240">Control</text><text x="500" y="240">1.08</text><text x="780" y="240">23.6</text><text x="1140" y="240">78.2</text><text x="1390" y="240">19.9</text>
+    <text x="80" y="320">Passivated</text><text x="500" y="320">1.12</text><text x="780" y="320">24.2</text><text x="1140" y="320">79.0</text><text x="1390" y="320">21.4</text></g>
+    <text x="64" y="416" font-size="24">Illustrative example · Source values remain linked to their PDF evidence.</text>
+  </g>
+</svg>

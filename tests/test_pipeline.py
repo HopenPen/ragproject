@@ -211,7 +211,7 @@ def test_responses_transport_contract_and_partial_output(env,monkeypatch):
     config=env.config.model_copy(update={'openai_api_key':__import__('pydantic').SecretStr('test-key')})
     result=ResponsesModel(config).call('classify',Classification.model_json_schema(),[{'number':7,'text':'article data','png':b'PNG'}],{})
     url,request=captured[0]
-    assert url=='https://api.openai.com/v1/responses' and request['json']['model']==config.model_id
+    assert url==config.openai_base_url.rstrip('/')+'/responses' and request['json']['model']==config.model_id
     assert request['json']['store'] is False and request['json']['text']['format']['strict'] is True
     assert any(c['type']=='input_image' and c['image_url'].startswith('data:image/png;base64,') for c in request['json']['input'][0]['content'])
     assert result['model']=='actual-api-model'

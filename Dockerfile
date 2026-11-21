@@ -12,6 +12,13 @@ LABEL org.opencontainers.image.source="https://github.com/minio/minio" org.openc
 USER minio
 ENTRYPOINT ["/usr/local/bin/minio"]
 
+FROM node:22.15.0-bookworm-slim AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm test && npm run build
+
 FROM python:3.12.10-slim-bookworm AS app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONPATH=/app
 WORKDIR /app
@@ -19,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr t
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home science
 COPY . .
+COPY --from=frontend-build /frontend/dist /frontend
 RUN mkdir -p /runtime /keys /public-keys /gateway && chown -R science:science /app /runtime /keys /public-keys /gateway
 USER science
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]

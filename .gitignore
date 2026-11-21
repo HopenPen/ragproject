@@ -26,3 +26,9 @@ infra/keys/
 *-smoke.json
 image-digest.txt
 minio-digest.txt
+node_modules/
+frontend/dist/
+frontend/public/pdfjs/
+frontend/src/styles/fonts.css
+playwright-report/
+test-results/

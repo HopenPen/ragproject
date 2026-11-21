@@ -59,7 +59,7 @@ class ResponsesModel:
                    'max_output_tokens': self.config.model_max_output_tokens}
         for attempt in range(self.config.max_retries + 1):
             try:
-                response = httpx.post('https://api.openai.com/v1/responses', json=payload,
+                response = httpx.post(self.config.openai_base_url.rstrip('/') + '/responses', json=payload,
                                       headers={'Authorization': 'Bearer ' + key}, timeout=self.config.model_timeout)
             except httpx.TransportError:
                 if attempt < self.config.max_retries:

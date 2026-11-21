@@ -99,7 +99,21 @@ class Documents:
 
     def corpora(self, actor):
         with self.uow() as u:
-            return u.repo.find('corpora', **({} if actor['role'] == 'admin' else {'owner_id': actor['id']}))
+            return [self.summary(u.repo, row) for row in u.repo.find('corpora', **({} if actor['role'] == 'admin' else {'owner_id': actor['id']}))]
+
+    @staticmethod
+    def summary(repo, row):
+        pubs = repo.find('publications', corpus_id=row['id'])
+        active = {rid for pub in pubs for rid in pub['current'].values()}
+        graphs = [repo.get('publication_revisions', rid)['graph'] for rid in active]
+        return {**row, 'stats': {
+            'documents': len(repo.find('documents', corpus_id=row['id'])),
+            'records': sum(len(g['results']) for g in graphs),
+            'issues_open': sum(i['review'] == 'open' and i['revision_id'] in active for i in repo.find('issues', corpus_id=row['id']))}}
+
+    def corpus_details(self, actor, id):
+        with self.uow() as u:
+            return self.summary(u.repo, corpus_access(u.repo.get('corpora', id), actor))
 
     def create_corpus(self, actor, values):
         require_editor(actor)
@@ -248,7 +262,7 @@ class Catalog:
         with self.uow() as u:
             pub = publication(u.repo, id, actor)
             rev = selected_revision(u.repo, pub, profile, revision)
-            return {'publication_id': id, 'domain_profile': rev['profile'], 'revision_id': rev['id'], 'graph': rev['graph']}
+            return {'publication_id': id, 'domain_profile': rev['profile'], 'revision_id': rev['id'], 'revision_number': rev['number'], 'graph': rev['graph']}
 
     def create(self, actor, corpus_id, document_id, graph, reason):
         with self.uow() as u:
@@ -264,7 +278,7 @@ class Catalog:
                 raise Error(409, 'profile_exists', 'Use graph replacement with If-Match')
             rev = save_revision(u.repo, pub, graph, actor, reason)
             u.commit()
-            return {'publication_id': pub['id'], 'domain_profile': rev['profile'], 'revision_id': rev['id'], 'graph': rev['graph']}
+            return {'publication_id': pub['id'], 'domain_profile': rev['profile'], 'revision_id': rev['id'], 'revision_number': rev['number'], 'graph': rev['graph']}
 
     def mutate(self, actor, id, profile, expected, reason, transform):
         with self.uow() as u:
@@ -278,7 +292,7 @@ class Catalog:
                 raise Error(409, 'profile_mismatch', 'Graph profile cannot change')
             new = save_revision(u.repo, pub, graph, actor, reason)
             u.commit()
-            return {'publication_id': id, 'domain_profile': new['profile'], 'revision_id': new['id'], 'graph': new['graph']}
+            return {'publication_id': id, 'domain_profile': new['profile'], 'revision_id': new['id'], 'revision_number': new['number'], 'graph': new['graph']}
 
     def entity(self, actor, id, entity_type, entity_id=None, operation='read', record=None, expected=None, reason=None):
         if entity_type not in ENTITIES:
