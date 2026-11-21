@@ -71,13 +71,14 @@ function conditions (r) {
   return [c.retrieval, c.chunk_size ? `фрагмент ${c.chunk_size}` : null, c.top_k !== null && c.top_k !== undefined ? `top_k ${c.top_k}` : null, c.reranker].filter(Boolean).join(', ')
 }
 const isSolar = computed(() => profile.value === 'solar-v1')
+const ctxText = r => isSolar.value ? [r.context.device, conditions(r)].filter(Boolean).join(', ') : [r.context.config, r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ')
 const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '↓') : ''
 </script>
 
 <template>
   <div class="page res">
     <div class="page__head">
-      <h1 class="page__title">Результаты<span class="count">{{ total }}</span></h1>
+      <h1 class="page__title">Результаты</h1>
       <span class="grow" />
       <Segmented v-model="profile" :options="[{ value: 'solar-v1', label: 'Солнечные элементы' }, { value: 'rag-v1', label: 'RAG-системы' }]" label="Профиль" />
     </div>
@@ -96,11 +97,6 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
         <option value="champion">лучший прибор</option>
         <option value="mean">среднее</option>
       </select>
-      <select v-model="origin" class="select select--sm res__sel" aria-label="Происхождение">
-        <option value="">Свои и цитаты</option>
-        <option value="primary">только из статьи</option>
-        <option value="cited">только цитаты</option>
-      </select>
       <label class="check res__check"><input v-model="issuesOnly" type="checkbox" class="cb">С замечаниями</label>
       <button v-if="filtered" class="btn btn--ghost btn--sm" type="button" @click="reset"><X />Сбросить</button>
     </div>
@@ -113,10 +109,9 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
             <th><button class="th-sort" type="button" @click="sortBy('publication_code')">Статья {{ arrow('publication_code') }}</button></th>
             <th><button class="th-sort" type="button" @click="sortBy('metric_name')">{{ isSolar ? 'Показатель' : 'Метрика' }} {{ arrow('metric_name') }}</button></th>
             <th class="t-num"><button class="th-sort" type="button" @click="sortBy('metric_value')">Значение {{ arrow('metric_value') }}</button></th>
-            <th>{{ isSolar ? 'Прибор' : 'Конфигурация' }}</th>
-            <th>{{ isSolar ? 'Условия' : 'Набор данных' }}</th>
+            <th>Условия</th>
             <th>Источник</th>
-            <th class="t-num">Замечания</th>
+            <th class="t-num"><span class="visually-hidden">Замечания</span></th>
           </tr>
         </thead>
         <tbody v-if="!loading || rows.length">
@@ -125,9 +120,8 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
             <td class="nowrap"><b>{{ r.publication_code }}</b> <span class="faint">{{ r.result_id }}</span><span v-if="r.origin === 'cited'" class="chip chip--plain res__cited">цитата</span></td>
             <td class="nowrap"><Metric :name="r.metric_name" :k="r.metric_k" /><span v-if="r.aggregation && r.aggregation !== 'champion'" class="muted">, {{ valueLabel('aggregation', r.aggregation) }}</span></td>
             <td class="t-num"><b class="res__val">{{ fmtResult(r) }}</b></td>
-            <td class="res__ctx">{{ isSolar ? r.context.device : `${r.context.config || '–'}${r.context.retrieval ? ', ' + r.context.retrieval : ''}` }}</td>
-            <td class="res__ctx muted">{{ isSolar ? conditions(r) : [r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</td>
-            <td class="nowrap"><span v-if="r.source.has_evidence" class="src-pill">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></span><span v-else class="src-pill src-pill--none">нет источника</span></td>
+            <td class="res__ctx" :title="ctxText(r)"><span class="res__dev">{{ isSolar ? r.context.device : (r.context.config || '–') }}</span><span class="res__cond">{{ isSolar ? conditions(r) : [r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</span></td>
+            <td class="nowrap res__src"><template v-if="r.source.has_evidence">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></template><span v-else class="res__nosrc">без источника</span></td>
             <td class="t-num"><span v-if="r.issues_open" class="count count--warn">{{ r.issues_open }}</span></td>
           </tr>
         </tbody>
@@ -158,11 +152,12 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
 .res__table { overflow: auto; margin-bottom: 80px; }
 .res__table .table th { height: 34px; font-size: 12px; background: var(--u-fill); }
 .res__val { font-weight: 500; }
-.res__ctx { max-width: 280px; color: var(--u-text-2); }
-.res__ctx.muted { color: var(--u-muted); }
+.res__ctx { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res__dev { color: var(--u-ink); }
+.res__cond { margin-left: 8px; color: var(--u-soft); }
 .res__cited { margin-left: 6px; height: 20px; font-size: 12px; }
-.src-pill { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--u-fill-2); color: var(--u-text-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
-.src-pill--none { background: none; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 35%, transparent); }
+.res__src { color: var(--u-muted); font-size: 12px; }
+.res__nosrc { color: var(--danger); }
 .th-sort { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
 .th-sort:hover { color: var(--u-ink); }
 .selbar { position: fixed; left: 50%; bottom: 20px; z-index: 35; display: flex; align-items: center; gap: 10px; width: min(520px, calc(100vw - 32px)); padding: 8px 8px 8px 16px; transform: translateX(-50%); background: var(--u-bg); color: var(--u-ink); border: 1px solid var(--u-border); border-radius: 12px; box-shadow: var(--u-shadow); font-weight: 500; }

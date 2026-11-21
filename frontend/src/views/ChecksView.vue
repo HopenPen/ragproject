@@ -80,23 +80,23 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
       <h1 class="page__title">Проверки</h1>
       <Segmented v-model="tab" :options="[{ value: 'issues', label: 'Замечания', count: counts.issues }, { value: 'queue', label: 'Очередь', count: counts.queue }]" label="Раздел проверок" />
       <span class="grow" />
-      <span v-if="lastValidate && !ui.mobile" class="checks__last">Последняя проверка {{ fmtDate(lastValidate.finished_at || lastValidate.created_at) }}</span>
-      <button v-if="editable && !ui.mobile" class="btn btn--accent" type="button" :disabled="!!runningJob" @click="validate"><ShieldCheck />{{ runningJob ? 'Проверяю…' : 'Запустить проверку' }}</button>
-    </div>
-
-    <template v-if="tab === 'issues'">
-      <div class="checks__filters">
-        <Segmented v-model="status" size="sm" :options="[{ value: 'open', label: 'Открытые' }, { value: 'confirmed', label: 'Подтверждённые' }, { value: 'dismissed', label: 'Отклонённые' }, { value: '', label: 'Все' }]" label="Статус" />
-        <span class="grow" />
+      <template v-if="tab === 'issues'">
+        <select v-model="status" class="select select--sm checks__sel" aria-label="Статус замечаний">
+          <option value="open">Открытые</option>
+          <option value="confirmed">Подтверждённые</option>
+          <option value="dismissed">Отклонённые</option>
+          <option value="">Все</option>
+        </select>
         <select v-if="!ui.mobile" v-model="profile" class="select select--sm checks__sel" aria-label="Профиль">
           <option value="">Оба профиля</option>
           <option value="solar-v1">Солнечные элементы</option>
           <option value="rag-v1">RAG-системы</option>
         </select>
-      </div>
-      <ul v-if="skipped.length && !ui.mobile" class="checks__skip">
-        <li v-for="s in skipped" :key="s.rule">{{ s.text }}</li>
-      </ul>
+      </template>
+      <button v-if="editable && !ui.mobile" class="btn btn--accent" type="button" :disabled="!!runningJob" :title="lastValidate ? `Последняя проверка ${fmtDate(lastValidate.finished_at || lastValidate.created_at)}` : ''" @click="validate"><ShieldCheck />{{ runningJob ? 'Проверяю…' : 'Запустить проверку' }}</button>
+    </div>
+
+    <template v-if="tab === 'issues'">
       <div v-if="loading" class="stack"><div v-for="i in 3" :key="i" class="skeleton" style="height: 120px; border-radius: 12px" /></div>
       <div v-else-if="!issues.length" class="panel empty">
         <h3>{{ status === 'open' ? 'Открытых замечаний нет' : 'Здесь пусто' }}</h3>
@@ -105,6 +105,7 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
       <div v-else class="checks__list">
         <IssueCard v-for="i in issues" :key="i.id" :issue="i" :editable="editable" show-doc @changed="load(); refreshCorpus()" @open="openIssue" />
       </div>
+      <p v-for="sk in skipped" v-show="!ui.mobile && !loading" :key="sk.rule" class="checks__skip">{{ sk.text }}</p>
     </template>
 
     <template v-else>
@@ -130,12 +131,8 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
 
 <style>
 .checks { max-width: 1080px; }
-.checks__last { color: var(--u-soft); }
-.checks__filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.checks__sel { width: auto; min-width: 180px; }
-.checks__skip { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); color: var(--u-muted); }
-.checks__skip li { display: flex; gap: 10px; }
-.checks__skip li::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--u-soft); flex: none; }
+.checks__sel { width: auto; min-width: 150px; }
+.checks__skip { margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--u-soft); }
 .checks__list { display: flex; flex-direction: column; gap: 8px; }
 .queue { overflow: hidden; }
 .queue__row { display: grid; grid-template-columns: 150px 56px minmax(0, 1fr) auto; align-items: center; gap: 0 12px; min-height: 56px; padding: 8px 12px 8px 16px; }

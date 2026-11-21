@@ -52,15 +52,14 @@ const tables = computed(() => {
 })
 const active = j => !TERMINAL.has(j.status)
 const value = j => j.progress?.total ? j.progress.done / j.progress.total : null
-function treeOf (j) {
+// состав архива плитками: папка профиля с числом файлов и файлы верхнего уровня
+function tilesOf (j) {
   const groups = new Map()
   for (const f of j.result?.files || []) {
-    const i = f.lastIndexOf('/')
-    const dir = i >= 0 ? f.slice(0, i + 1) : ''
-    if (!groups.has(dir)) groups.set(dir, [])
-    groups.get(dir).push(f.slice(i + 1))
+    const top = f.includes('/') ? f.slice(0, f.indexOf('/')) : f
+    groups.set(top, (groups.get(top) || 0) + (f.includes('/') ? 1 : 0))
   }
-  return [...groups.entries()].map(([dir, files]) => ({ dir, files }))
+  return [...groups.entries()].map(([name, n]) => ({ name, kind: n ? countText(n, ['файл', 'файла', 'файлов']) : name.split('.').pop().toUpperCase(), folder: n > 0 }))
 }
 const latest = computed(() => exports.value.find(j => j.status === 'succeeded'))
 watch(() => ws.jobsVersion, () => {})
@@ -80,14 +79,14 @@ onMounted(() => kickJobs())
         </fieldset>
         <fieldset class="exp__set">
           <legend class="field__label">Режим</legend>
-          <label class="exp__mode" :class="{ 'is-on': mode === 'strict' }"><input v-model="mode" type="radio" value="strict"><span><b>Строгая</b><span class="muted">Остановится, если есть статьи без принятой темы или результаты без источника.</span></span></label>
-          <label class="exp__mode" :class="{ 'is-on': mode === 'incomplete' }"><input v-model="mode" type="radio" value="incomplete"><span><b>С пропусками</b><span class="muted">Соберёт всё готовое, пропуски перечислит в manifest.json.</span></span></label>
+          <label class="exp__mode" :class="{ 'is-on': mode === 'strict' }"><input v-model="mode" type="radio" value="strict"><span><b>Строгая</b><span class="muted">Только принятые статьи и значения с источником</span></span></label>
+          <label class="exp__mode" :class="{ 'is-on': mode === 'incomplete' }"><input v-model="mode" type="radio" value="incomplete"><span><b>С пропусками</b><span class="muted">Всё готовое, пропуски в manifest.json</span></span></label>
         </fieldset>
-        <fieldset class="exp__set">
-          <legend class="field__label">Проверки перед сборкой</legend>
+        <details class="exp__more">
+          <summary>Проверки перед сборкой<span class="exp__more-n">{{ [checkSources, checker && profiles.includes('solar-v1')].filter(Boolean).length }} из 2</span></summary>
           <label class="check"><input v-model="checkSources" type="checkbox" class="cb">Сверить источники значений</label>
           <label class="check" :class="{ 'is-off': !profiles.includes('solar-v1') }"><input v-model="checker" type="checkbox" class="cb" :disabled="!profiles.includes('solar-v1')">Внешний checker для solar</label>
-        </fieldset>
+        </details>
         <button class="btn btn--accent btn--block btn--lg" type="button" :disabled="busy || !editable || !profiles.length" @click="create()"><PackageCheck />Собрать выгрузку</button>
         <p v-if="!editable" class="field__hint">Собирать выгрузку может редактор корпуса.</p>
       </section>
@@ -108,16 +107,17 @@ onMounted(() => kickJobs())
           </div>
           <template v-else-if="j.status === 'succeeded'">
             <p class="exp__meta muted"><span class="mono">{{ j.result.file_name }}</span>, {{ fmtBytes(j.result.size_bytes) }}, {{ countText(j.result.documents, ['статья', 'статьи', 'статей']) }} с данными</p>
-            <p v-if="j.result.gaps?.length" class="exp__gaps">Пропуски ({{ j.result.gaps.length }}): {{ j.result.gaps.map(g => `${g.publication_code}, ${g.reason}`).join('; ') }}</p>
+            <p v-if="j.result.gaps?.length" class="exp__gaps" :title="j.result.gaps.map(g => `${g.publication_code}: ${g.reason}`).join('\n')">Пропущено {{ countText(j.result.gaps.length, ['статья', 'статьи', 'статей']) }}: {{ j.result.gaps.map(g => g.publication_code).join(', ') }}, причины в manifest.json</p>
             <ul class="ui-files__grid exp__files">
-              <template v-for="g in treeOf(j)" :key="g.dir">
-                <li v-for="f in g.files" :key="g.dir + f" class="ui-file is-done" :title="g.dir ? `${g.dir}/${f}` : f">
-                  <span class="ui-file__icon"><svg class="ui-file__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.25 2.75h8L18.75 7.25v14H6.25z" /><path d="M14 2.75v4.75h4.75M9 12.5h6.5M9 15.5h6.5M9 18.5h4" /></svg></span>
-                  <span class="ui-file__name">{{ f }}</span>
-                  <span class="ui-file__kind">{{ g.dir ? g.dir.split('/')[0] : f.split('.').pop().toUpperCase() }}</span>
-                  <span class="ui-file__check"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
-                </li>
-              </template>
+              <li v-for="t in tilesOf(j)" :key="t.name" class="ui-file is-done">
+                <span class="ui-file__icon">
+                  <svg v-if="t.folder" class="ui-file__glyph exp__folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h6l2 2h10v10.5H3z" /></svg>
+                  <svg v-else class="ui-file__glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.25 2.75h8L18.75 7.25v14H6.25z" /><path d="M14 2.75v4.75h4.75M9 12.5h6.5M9 15.5h6.5M9 18.5h4" /></svg>
+                </span>
+                <span class="ui-file__name">{{ t.name }}</span>
+                <span class="ui-file__kind">{{ t.kind }}</span>
+                <span class="ui-file__check"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 8.2 2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+              </li>
             </ul>
             <div class="exp__actions">
               <button class="btn btn--primary btn--sm" type="button" @click="download(j)"><Download />Скачать ZIP</button>
@@ -181,6 +181,14 @@ onMounted(() => kickJobs())
 .exp__mode b { font-weight: 500; }
 .exp__mode .muted { font-size: 12px; line-height: 16px; }
 .check.is-off { opacity: .5; }
+.exp__more { margin: -4px 0 16px; }
+.exp__more summary { display: flex; align-items: center; gap: 8px; height: 28px; color: var(--u-muted); list-style: none; }
+.exp__more summary::-webkit-details-marker { display: none; }
+.exp__more summary::after { content: ""; width: 6px; height: 6px; margin-left: 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform 160ms var(--u-ease); }
+.exp__more[open] summary::after { transform: rotate(225deg) translateY(-1px); }
+.exp__more summary:hover { color: var(--u-ink); }
+.exp__more-n { color: var(--u-soft); }
+.exp__more .check { margin-top: 8px; }
 .exp__list { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .exp__list h2 { margin-bottom: 0; }
 .exp__job { padding: 14px 16px 16px; }
@@ -189,12 +197,13 @@ onMounted(() => kickJobs())
 .exp__jhead .muted { color: var(--u-soft); }
 .exp__run { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .exp__meta { margin-top: 6px; font-size: 12px; line-height: 16px; }
-.exp__gaps { display: flex; gap: 8px; margin-top: 8px; color: var(--u-text-2); font-size: 12px; line-height: 16px; }
+.exp__gaps { display: flex; gap: 8px; margin-top: 6px; color: var(--u-muted); font-size: 12px; line-height: 16px; }
 .exp__gaps::before { content: ""; width: 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: var(--ochre); flex: none; }
-.exp__files { margin-top: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.exp__files { margin-top: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 168px)); gap: 8px; }
 .exp__files .ui-file { height: 96px; padding: 12px 8px 0; box-shadow: none; }
 .exp__files .ui-file__icon { width: 32px; height: 32px; margin-bottom: 8px; border-radius: 8px; }
 .exp__files .ui-file__glyph { width: 20px; height: 20px; }
+.exp__files .ui-file__icon .exp__folder { stroke: #4A4A46; }
 .exp__files .ui-file__name { font-size: 12px; }
 .exp__files .ui-file__kind { font-size: 12px; color: var(--u-soft); }
 .exp__files .ui-file__check { top: 6px; right: 6px; width: 16px; height: 16px; }

@@ -218,8 +218,7 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
         <div v-if="pub && Object.keys(pub.profiles).length > 1" class="art__profiles" role="tablist" aria-label="Профиль">
           <button v-for="p in Object.keys(pub.profiles)" :key="p" type="button" role="tab" class="pill" :class="{ 'is-on': p === profile }" :aria-selected="p === profile" @click="switchProfile(p)">{{ profileShort(p) }}</button>
         </div>
-        <button v-if="graph && pub?.profiles?.[profile]?.candidates && !ui.mobile" class="chip chip--wait art__cand" type="button" @click="historyOpen = true">Новая версия</button>
-        <button v-if="graph && !ui.mobile" class="btn btn--ghost btn--sm" type="button" @click="historyOpen = true"><History />Версия {{ graph.revision_number }}</button>
+        <button v-if="graph && !ui.mobile" class="btn btn--ghost btn--sm" type="button" @click="historyOpen = true"><History /><span>Версия {{ graph.revision_number }}<span v-if="pub?.profiles?.[profile]?.candidates" class="art__new">, есть новая</span></span></button>
       </template>
     </header>
 
@@ -248,7 +247,6 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
               <p>Граф изменён, замечания посчитаны по прежней версии.</p>
               <button class="btn btn--sm" type="button" :disabled="!!recheckJob || !editable" @click="recheck"><RefreshCw />{{ recheckJob ? 'Проверяю…' : 'Пересчитать' }}</button>
             </div>
-            <div v-if="isResult && !ui.mobile && items.length" class="recs__cols" aria-hidden="true"><span>Показатель</span><span class="t-r">Значение</span><span>Источник</span></div>
           </div>
 
           <ul ref="listEl" class="recs">
@@ -264,7 +262,7 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
                   <span class="rec__sub">{{ rowText(type, it, graph).sub }}</span>
                 </span>
                 <span v-if="isResult" class="rec__val num">{{ fmtResult(it) }}</span>
-                <span v-if="isResult" class="rec__src" :class="{ 'is-none': !pageOf(it) }">{{ pageOf(it) ? `стр. ${pageOf(it)}` : 'нет' }}</span>
+                <span v-if="isResult" class="rec__src" :class="{ 'is-none': !pageOf(it) }">{{ pageOf(it) ? `стр. ${pageOf(it)}` : 'без источника' }}</span>
               </button>
               <div v-if="selectedId === rid(it) && !ui.mobile" class="rec__detail">
                 <RecordDetail :type="type" :item="it" :graph="graph" :etag="etag" :profile="profile" :publication-id="pub.id" :document-id="doc.id" :issues="issuesFor(rid(it))" :editable="editable" @edit="edit" @changed="onChanged" @stale="onStale" @issues-changed="loadIssues" />
@@ -339,12 +337,11 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 .art__code { flex: none; font-weight: 500; }
 .art__title { min-width: 0; flex: 0 1 auto; font-size: 13px; line-height: 20px; font-weight: 400; color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .art__profiles { display: flex; gap: 4px; flex: none; }
-.art__cand { border: 0; }
 .art__body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 36vw, 520px); }
 .art__pdf { min-width: 0; min-height: 0; border-right: 1px solid var(--u-line); }
 .art__panel { min-height: 0; overflow: auto; }
 .art__pad { padding: 12px 16px; }
-.art__top { position: sticky; top: 0; z-index: 2; background: var(--u-bg); }
+.art__top { position: sticky; top: 0; z-index: 2; background: var(--u-bg); box-shadow: inset 0 -1px 0 var(--u-line); }
 .art__tabs { display: flex; gap: 4px; padding: 12px 14px 8px; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 .art__tools { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px 6px 16px; }
 .art__tools .check { gap: 8px; color: var(--u-text-2); }
@@ -360,9 +357,7 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 .pill__n { color: var(--u-soft); font-variant-numeric: tabular-nums; font-weight: 400; }
 .pill.is-on .pill__n { color: var(--u-muted); }
 
-.recs__cols, .rec--result .rec__row { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; column-gap: 12px; }
-.recs__cols { height: 30px; align-items: center; padding: 0 16px; font-size: 12px; line-height: 16px; color: var(--u-soft); box-shadow: inset 0 -1px 0 var(--u-line); }
-.recs__cols .t-r { text-align: right; }
+.rec--result .rec__row { display: grid; grid-template-columns: minmax(0, 1fr) auto 84px; column-gap: 12px; }
 .recs { padding: 0 0 32px; }
 .rec { box-shadow: inset 0 -1px 0 var(--u-line); scroll-margin-top: 132px; }
 .rec__row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; width: 100%; min-height: 52px; padding: 8px 16px; border: 0; background: none; text-align: left; transition: background-color 160ms var(--u-ease); }
@@ -375,8 +370,9 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
 .rec__id { font-size: 12px; font-weight: 400; color: var(--u-soft); }
 .rec__sub { display: block; color: var(--u-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec__val { text-align: right; font-weight: 500; white-space: nowrap; }
-.rec__src { justify-self: start; padding: 2px 8px; border-radius: 6px; background: var(--u-fill-2); color: var(--u-text-2); font-size: 12px; line-height: 16px; white-space: nowrap; }
-.rec__src.is-none { background: none; color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 35%, transparent); }
+.rec__src { text-align: right; color: var(--u-soft); font-size: 12px; line-height: 16px; white-space: nowrap; }
+.rec__src.is-none { color: var(--danger); }
+.art__new { font-weight: 400; color: var(--u-muted); }
 .rec__detail { padding: 14px 16px 18px; background: var(--u-fill); box-shadow: inset 0 1px 0 var(--u-line); }
 
 .art__state { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 40px 24px; max-width: 460px; color: var(--u-text-2); }

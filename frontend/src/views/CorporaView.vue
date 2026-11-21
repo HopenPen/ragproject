@@ -50,7 +50,7 @@ async function create () {
     </header>
     <main class="page corpora">
       <div class="page__head">
-        <h1 class="page__title">Корпуса<span v-if="ws.corpora.length" class="count">{{ ws.corpora.length }}</span></h1>
+        <h1 class="page__title">Корпуса</h1>
         <span class="grow" />
         <button v-if="canCreate" class="btn btn--accent" type="button" @click="createOpen = true; fieldError = ''"><Plus />Новый корпус</button>
       </div>

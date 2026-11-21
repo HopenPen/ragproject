@@ -4,12 +4,12 @@
 import { computed, ref } from 'vue'
 import { X } from '@lucide/vue'
 import Progress from '../ui/Progress.vue'
-import Chip from '../ui/Chip.vue'
 import JobDrawer from './JobDrawer.vue'
 import ClassificationDialog from './ClassificationDialog.vue'
 import { ws } from '../../stores/workspace.js'
 import { canEdit } from '../../stores/session.js'
-import { JOB_KIND, JOB_STATUS, STAGE, TERMINAL } from '../../lib/labels.js'
+import { ui } from '../../stores/ui.js'
+import { JOB_KIND, STAGE, TERMINAL } from '../../lib/labels.js'
 import { countText } from '../../lib/format.js'
 
 const props = defineProps({ waitingDocs: { type: Array, default: () => [] } })
@@ -35,57 +35,46 @@ const summary = computed(() => {
   const parts = []
   if (c.value.succeeded) parts.push(`готово ${c.value.succeeded}`)
   if (c.value.waiting_review) parts.push(`ждёт решения ${c.value.waiting_review}`)
-  if (c.value.blocked) parts.push(`без модели ${c.value.blocked}`)
+  if (c.value.blocked) parts.push(`нужен повтор ${c.value.blocked}`)
   if (c.value.failed) parts.push(`ошибок ${c.value.failed}`)
   if (c.value.cancelled) parts.push(`отменено ${c.value.cancelled}`)
-  const text = parts.join(', ')
-  return text ? text[0].toUpperCase() + text.slice(1) + '.' : ''
+  return parts.join(', ')
 })
 </script>
 
 <template>
   <div v-if="job" class="jbanner" :class="{ 'jbanner--wait': waiting }">
     <span class="jbanner__mark" :class="waiting ? 'is-wait' : finished ? 'is-done' : 'is-run'" aria-hidden="true" />
-    <div class="jbanner__text">
-      <p class="jbanner__title">
-        <template v-if="waiting">{{ JOB_KIND[job.kind] }} ждёт решения по теме<template v-if="waitingDoc">: {{ waitingDoc.publication_code }}</template></template>
-        <template v-else-if="finished">{{ JOB_KIND[job.kind] }} завершена</template>
-        <template v-else>{{ JOB_KIND[job.kind] }}: {{ doneCount }} из {{ countText(c.total || 0, ['статьи', 'статей', 'статей']) }}</template>
-        <Chip v-if="finished" :tone="JOB_STATUS[job.status]?.tone" :text="JOB_STATUS[job.status]?.text" />
-      </p>
-      <p class="jbanner__sub muted">
-        <template v-if="!finished && job.stage_document">{{ job.stage_document }}: {{ (STAGE[job.stage] || job.stage).toLowerCase() }}. </template>
-        <span v-if="waiting" class="jbanner__why">Остальные статьи обработаны, задание продолжится после решения. </span>
-        {{ summary }}
-      </p>
-      <Progress v-if="!finished && !waiting" :value="value" class="jbanner__bar" />
-    </div>
-    <div class="jbanner__actions">
-      <button v-if="waiting && waitingDoc && canEdit(ws.corpus)" class="btn btn--primary btn--sm" type="button" @click="decide = waitingDoc">Решить тему</button>
-      <button class="btn btn--sm" type="button" @click="drawer = job.id">Подробнее</button>
-      <button v-if="finished" class="btn btn--ghost btn--icon btn--sm" type="button" aria-label="Скрыть" @click="dismissed.add(job.id)"><X /></button>
-    </div>
+    <p class="jbanner__title">
+      <template v-if="waiting">{{ JOB_KIND[job.kind] }} ждёт решения по теме{{ waitingDoc ? ` ${waitingDoc.publication_code}` : '' }}</template>
+      <template v-else-if="finished">{{ JOB_KIND[job.kind] }} завершена</template>
+      <template v-else>{{ JOB_KIND[job.kind] }}: {{ doneCount }} из {{ countText(c.total || 0, ['статьи', 'статей', 'статей']) }}</template>
+      <span v-if="!waiting && !ui.mobile" class="jbanner__sub"><template v-if="!finished && job.stage_document">{{ job.stage_document }}, {{ (STAGE[job.stage] || job.stage).toLowerCase() }}</template><template v-else-if="finished">{{ summary }}</template></span>
+    </p>
+    <span class="grow" />
+    <button v-if="waiting && waitingDoc && canEdit(ws.corpus)" class="btn btn--primary btn--sm" type="button" @click="decide = waitingDoc">Решить тему</button>
+    <button class="btn btn--ghost btn--sm" type="button" @click="drawer = job.id">Подробнее</button>
+    <button v-if="finished" class="btn btn--ghost btn--icon btn--sm" type="button" aria-label="Скрыть" @click="dismissed.add(job.id)"><X /></button>
+    <Progress v-if="!finished && !waiting" :value="value" class="jbanner__bar" />
     <JobDrawer :open="!!drawer" :job-id="drawer" @close="drawer = null" />
     <ClassificationDialog :open="!!decide" :document-id="decide?.id" :code="decide?.publication_code" @close="decide = null" @done="emit('changed')" />
   </div>
 </template>
 
 <style>
-/* полоса задания: строка статуса из окна кита; идущая работа отмечена акцентом, ожидание чернилами */
-.jbanner { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 10px 10px 14px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; }
-.jbanner__mark { width: 14px; height: 14px; flex: none; align-self: flex-start; margin-top: 3px; border-radius: 50%; }
+/* полоса задания в одну строку: что идёт и одно действие; прогресс тонкой линией по нижнему краю */
+.jbanner { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 12px; padding: 6px 8px 6px 14px; background: var(--u-bg); border: 1px solid var(--u-border); border-radius: 12px; overflow: hidden; }
+.jbanner__mark { width: 14px; height: 14px; flex: none; border-radius: 50%; }
 .jbanner__mark.is-run { border: 2px solid color-mix(in oklab, var(--u-accent) 30%, transparent); border-top-color: var(--u-accent); animation: ui-spin 800ms linear infinite; }
-.jbanner__mark.is-wait { width: 8px; height: 8px; margin: 6px 3px 0; background: var(--u-ink); }
-.jbanner__mark.is-done { width: 8px; height: 8px; margin: 6px 3px 0; background: var(--u-accent); }
-.jbanner__text { flex: 1; min-width: 0; }
-.jbanner__title { display: flex; align-items: center; gap: 10px; font-weight: 500; flex-wrap: wrap; }
-.jbanner__sub { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
-.jbanner__bar { margin-top: 8px; max-width: 520px; }
-.jbanner__actions { display: flex; gap: 6px; flex: none; }
+.jbanner__mark.is-wait { width: 8px; height: 8px; margin: 0 3px; background: var(--u-ink); }
+.jbanner__mark.is-done { width: 8px; height: 8px; margin: 0 3px; background: var(--u-accent); }
+.jbanner__title { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jbanner__sub { margin-left: 10px; font-weight: 400; color: var(--u-muted); }
+.jbanner__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; border-radius: 0; background: transparent; }
 @media (max-width: 719px) {
-  .jbanner__why { display: none; }
-  .jbanner { flex-wrap: wrap; gap: 10px; }
-  .jbanner__actions { flex-basis: 100%; }
-  .jbanner__actions .btn { flex: 1; }
+  .jbanner { flex-wrap: wrap; padding: 10px 12px; }
+  .jbanner__title { flex: 1 1 calc(100% - 30px); white-space: normal; }
+  .jbanner .grow { display: none; }
+  .jbanner .btn { flex: 1; }
 }
 </style>

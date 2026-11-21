@@ -3,9 +3,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Upload, Play, ChevronDown, Tags, RotateCcw } from '@lucide/vue'
+import { Upload, Play, Tags, RotateCcw } from '@lucide/vue'
 import Chip from '../components/ui/Chip.vue'
-import Menu from '../components/ui/Menu.vue'
 import JobBanner from '../components/app/JobBanner.vue'
 import UploadDialog from '../components/app/UploadDialog.vue'
 import { documents, jobs } from '../api/index.js'
@@ -14,8 +13,8 @@ import { canEdit } from '../stores/session.js'
 import { ui } from '../stores/ui.js'
 import { notify } from '../stores/toasts.js'
 import { askReason } from '../stores/dialogs.js'
-import { DOC_STATUS, STAGE, profileShort, LABEL_TO_PROFILE } from '../lib/labels.js'
-import { fmtDate, fmtNum, countText } from '../lib/format.js'
+import { DOC_STATUS, STAGE } from '../lib/labels.js'
+import { fmtNum, countText } from '../lib/format.js'
 
 const router = useRouter()
 const list = ref([])
@@ -88,17 +87,15 @@ async function run (kind) {
     notify.error(e)
   }
 }
-const topic = d => (d.classification?.labels || []).map(l => profileShort(LABEL_TO_PROFILE[l]))
 // метка темы в плитке строки, как в окне продукта на лендинге: S солнечные элементы, R RAG
 const tag = d => { const l = d.classification?.labels || []; return l.includes('solar') && l.includes('rag') ? 'SR' : l.includes('solar') ? 'S' : l.includes('rag') ? 'R' : '–' }
 const tone = d => { const l = d.classification?.labels || []; return l.includes('solar') ? 2 : l.includes('rag') ? 4 : 0 }
-const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outside' ? 'вне тем' : null), d.page_count ? `${d.page_count} стр.` : null, d.year].filter(Boolean).join(', ')
 </script>
 
 <template>
   <div class="page docs">
     <div class="page__head">
-      <h1 class="page__title">Документы<span class="count">{{ list.length }}</span></h1>
+      <h1 class="page__title">Документы</h1>
       <div class="docs__filters" role="tablist" aria-label="Фильтр по статусу">
         <button v-for="(g, k) in GROUPS" v-show="k === 'all' || counts[k]" :key="k" type="button" role="tab" class="docs__filter" :class="{ 'is-on': filter === k }" :aria-selected="filter === k" @click="filter = k">
           {{ g.label }}<span class="num">{{ counts[k] }}</span>
@@ -106,14 +103,15 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
       </div>
       <span class="grow" />
       <template v-if="editable && !ui.mobile">
-        <Menu width="240px">
-          <template #trigger="{ toggle: t }">
-            <button class="btn btn--ghost" type="button" @click="t">Ещё<ChevronDown /></button>
-          </template>
-          <button class="menu__item" type="button" @click="run('classify')"><Tags />Определить тему{{ selected.size ? ` (${selected.size})` : '' }}</button>
-        </Menu>
-        <button class="btn" type="button" :disabled="!list.length" @click="run('process')"><Play />{{ selected.size ? `Обработать выбранные (${selected.size})` : 'Обработать все' }}</button>
-        <button class="btn btn--accent" type="button" @click="uploadOpen = true"><Upload />Загрузить PDF</button>
+        <template v-if="selected.size">
+          <button class="btn btn--ghost" type="button" @click="selected.clear()">Снять выбор</button>
+          <button class="btn" type="button" @click="run('classify')"><Tags />Определить тему</button>
+          <button class="btn btn--primary" type="button" @click="run('process')"><Play />Обработать выбранные ({{ selected.size }})</button>
+        </template>
+        <template v-else>
+          <button class="btn btn--ghost" type="button" :disabled="!list.length" @click="run('process')"><Play />Обработать все</button>
+          <button class="btn btn--accent" type="button" @click="uploadOpen = true"><Upload />Загрузить PDF</button>
+        </template>
       </template>
     </div>
 
@@ -129,7 +127,7 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
     <div v-else class="panel docs__list" :class="{ 'is-picking': selected.size }">
       <div v-if="!ui.mobile" class="docs__cols" aria-hidden="true">
         <span><input v-if="editable" type="checkbox" class="cb docs__all" :checked="allChecked" aria-label="Выбрать все" @change="toggleAll"></span>
-        <span>Статья</span><span>Содержание</span><span>Статус</span><span class="t-r">Записи</span><span class="t-r">Замеч.</span><span class="t-r">Загружен</span>
+        <span>Статья</span><span>Название</span><span>Статус</span><span class="t-r">Записи</span><span class="t-r">Замеч.</span>
       </div>
       <ul>
         <li v-for="d in shown" :key="d.id" class="docs__row" :class="{ 'is-sel': selected.has(d.id) }" @click="open(d)">
@@ -141,16 +139,14 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
           <span class="docs__sub">
             <span class="docs__title">{{ d.title || d.original_filename }}</span>
             <span v-if="d.status_hint" class="docs__hint">{{ d.status_hint }}</span>
-            <span v-else class="docs__meta">{{ meta(d) }}</span>
           </span>
           <span class="docs__st">
             <Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" />
-            <button v-if="d.status === 'blocked' && editable && !ui.mobile" class="btn btn--sm" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)"><RotateCcw />Повторить задание</button>
             <span v-if="d.status === 'processing' && d.processing" class="docs__stage">{{ STAGE[d.processing.stage] }}<template v-if="d.processing.progress?.total && ['text', 'extract'].includes(d.processing.stage)">, {{ d.processing.progress.done }}/{{ d.processing.progress.total }}</template></span>
+            <button v-if="d.status === 'blocked' && editable && !ui.mobile" class="btn btn--sm" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)"><RotateCcw />Повторить задание</button>
           </span>
           <span class="docs__n num">{{ d.records ? fmtNum(d.records, 0) : '' }}</span>
           <span class="docs__n"><span v-if="d.issues_open" class="count count--warn">{{ d.issues_open }}</span></span>
-          <span class="docs__age">{{ fmtDate(d.created_at) }}</span>
         </li>
       </ul>
       <p v-if="!shown.length" class="empty">В этом фильтре статей нет.</p>
@@ -168,10 +164,10 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
 .docs__filter.is-on { color: var(--u-ink); background: var(--u-fill-2); font-weight: 500; }
 .docs__filter.is-on .num { color: var(--u-muted); }
 .docs__list { overflow: hidden; }
-.docs__cols, .docs__row { display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) 170px 64px 64px 112px; align-items: center; gap: 0 12px; padding: 0 16px; }
-.docs__cols { height: 34px; color: var(--u-soft); background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line); }
+.docs__cols, .docs__row { display: grid; grid-template-columns: 28px 56px minmax(0, 1fr) 176px 56px 56px; align-items: center; gap: 0 12px; padding: 0 16px; }
+.docs__cols { height: 34px; color: var(--u-soft); box-shadow: inset 0 -1px 0 var(--u-line); }
 .docs__cols .t-r { text-align: right; }
-.docs__row { min-height: 52px; padding-top: 6px; padding-bottom: 6px; cursor: pointer; transition: background-color 160ms var(--u-ease); }
+.docs__row { min-height: 44px; padding-top: 6px; padding-bottom: 6px; cursor: pointer; transition: background-color 160ms var(--u-ease); }
 .docs__row + .docs__row { box-shadow: inset 0 1px 0 var(--u-line); }
 .docs__row:hover { background: color-mix(in oklab, var(--u-ink) 3%, var(--u-bg)); }
 .docs__row.is-sel { background: var(--u-tint); }
@@ -184,16 +180,10 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
 .docs__who { font-weight: 500; white-space: nowrap; }
 .docs__sub { display: flex; flex-direction: column; min-width: 0; }
 .docs__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docs__meta { color: var(--u-soft); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docs__hint { color: var(--u-text-2); font-size: 12px; line-height: 16px; }
+.docs__hint { color: var(--u-muted); font-size: 12px; line-height: 16px; }
 .docs__st { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .docs__stage { font-size: 12px; line-height: 16px; color: var(--u-soft); }
 .docs__n { text-align: right; color: var(--u-text-2); }
-.docs__age { text-align: right; color: var(--u-soft); white-space: nowrap; }
-@media (max-width: 1100px) {
-  .docs__cols, .docs__row { grid-template-columns: 28px 56px minmax(0, 1fr) 160px 56px 56px; }
-  .docs__cols span:last-child, .docs__age { display: none; }
-}
 @media (max-width: 719px) {
   .page__head .docs__filters { order: 5; flex-basis: 100%; margin: 4px 0 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .docs__filter { flex: none; }
@@ -202,6 +192,6 @@ const meta = d => [topic(d).join(', ') || (d.classification?.outcome === 'outsid
   .docs__who { grid-column: 2; grid-row: 1; }
   .docs__sub { grid-column: 2 / 4; grid-row: 2; }
   .docs__st { grid-column: 3; grid-row: 1; align-items: flex-end; }
-  .docs__n, .docs__age, .docs__stage { display: none; }
+  .docs__n, .docs__stage { display: none; }
 }
 </style>

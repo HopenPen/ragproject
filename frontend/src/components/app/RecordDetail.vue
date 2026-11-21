@@ -4,7 +4,6 @@
 import { computed, ref } from 'vue'
 import { Pencil, Trash2, Check, X } from '@lucide/vue'
 import Chip from '../ui/Chip.vue'
-import Metric from '../ui/Metric.vue'
 import IssueCard from './IssueCard.vue'
 import SourceCrop from './SourceCrop.vue'
 import { publications } from '../../api/index.js'
@@ -12,7 +11,7 @@ import { askReason } from '../../stores/dialogs.js'
 import { notify } from '../../stores/toasts.js'
 import { EVIDENCE_REVIEW, METHOD, ID_FIELD, fieldLabel, valueLabel } from '../../lib/labels.js'
 import { evidenceOf, quoteParts, resultContext } from '../../lib/records.js'
-import { fmtNum, fmtValue, fmtUnit, fmtResult } from '../../lib/format.js'
+import { fmtNum, fmtValue, fmtUnit } from '../../lib/format.js'
 
 const props = defineProps({
   type: String, item: Object, graph: Object, etag: String, profile: String, publicationId: String, documentId: String,
@@ -25,6 +24,13 @@ const ev = computed(() => evidenceOf(props.graph, props.item[ID_FIELD[props.type
 const ctx = computed(() => isResult.value ? resultContext(props.type, props.item, props.graph) : { rows: [] })
 const rawDiffers = computed(() => isResult.value && props.item.raw_value && (Number(String(props.item.raw_value).split(' ')[0]) !== Number(props.item.metric_value) || /±/.test(props.item.raw_value) || (props.item.raw_unit && props.item.raw_unit !== props.item.metric_unit)))
 const normDiffers = computed(() => isResult.value && props.item.normalized_value !== null && props.item.normalized_value !== undefined && (props.item.normalized_value !== props.item.metric_value || props.item.normalized_unit !== props.item.metric_unit))
+// агрегация, разброс и число приборов: то, чего нет в строке записи
+const extra = computed(() => {
+  if (!isResult.value) return ''
+  const it = props.item
+  const text = [it.aggregation ? valueLabel('aggregation', it.aggregation) : null, it.spread_value !== null && it.spread_value !== undefined ? `разброс ±${fmtNum(it.spread_value)}` : null, it.n_devices ? `n = ${it.n_devices}` : null].filter(Boolean).join(', ')
+  return text ? text[0].toUpperCase() + text.slice(1) : ''
+})
 const fields = computed(() => Object.entries(props.item).filter(([k, v]) => v !== null && v !== '' && k !== ID_FIELD[props.type] && !k.startsWith('source_')))
 const openIssues = computed(() => props.issues.filter(i => !i.stale))
 const tone = computed(() => openIssues.value.some(i => i.status === 'open' && i.severity === 'error') ? 'error' : openIssues.value.some(i => i.status === 'open') ? 'warn' : 'ok')
@@ -60,10 +66,9 @@ async function remove () {
 
 <template>
   <div class="rdetail">
-    <section v-if="isResult" class="rdetail__value">
-      <p class="rdetail__big num">{{ fmtResult(item) }}</p>
-      <p class="rdetail__what"><Metric :name="item.metric_name" :k="item.metric_k" /><template v-if="item.aggregation">, {{ valueLabel('aggregation', item.aggregation) }}</template><template v-if="item.spread_value !== null && item.spread_value !== undefined">, разброс ±{{ fmtNum(item.spread_value) }}</template><template v-if="item.n_devices">, n = {{ item.n_devices }}</template></p>
-      <p v-if="rawDiffers || normDiffers" class="rdetail__raw muted">
+    <section v-if="isResult && (extra || rawDiffers || normDiffers || item.result_origin === 'cited' || item.duplicate_of)" class="rdetail__value">
+      <p v-if="extra" class="rdetail__what">{{ extra }}</p>
+      <p v-if="rawDiffers || normDiffers" class="rdetail__raw">
         <template v-if="rawDiffers">В статье: <span class="num">{{ item.raw_value }}</span> {{ item.raw_unit ? fmtUnit(item.raw_unit) : '' }}. </template>
         <template v-if="normDiffers">Нормализовано: <span class="num">{{ fmtValue(item.normalized_value, item.normalized_unit) }}</span>.</template>
       </p>
@@ -76,15 +81,16 @@ async function remove () {
       <template v-if="ev">
         <SourceCrop v-if="mobile && ev.bbox" :document-id="documentId" :page="ev.page" :bbox="ev.bbox" :tone="tone" />
         <blockquote v-if="!(mobile && ev.bbox)" class="quote"><template v-for="(p, i) in quoteParts(ev.fragment, item.raw_value)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template></blockquote>
-        <p class="rdetail__where muted">стр. {{ ev.page }}<template v-if="ev.table">, {{ ev.table }}</template><template v-if="ev.figure">, {{ ev.figure }}</template>; {{ METHOD[ev.method] || ev.method }}, уверенность {{ fmtNum(ev.confidence, 2) }}</p>
-        <div class="rdetail__review">
-          <Chip :tone="EVIDENCE_REVIEW[ev.review_status]?.tone" :text="EVIDENCE_REVIEW[ev.review_status]?.text" />
+        <div class="rdetail__line">
+          <span class="rdetail__where">стр. {{ ev.page }}<template v-if="ev.table">, {{ ev.table }}</template><template v-if="ev.figure">, {{ ev.figure }}</template><template v-if="['ocr', 'vision'].includes(ev.method)">, {{ METHOD[ev.method] }}</template>, уверенность {{ fmtNum(ev.confidence, 2) }}</span>
+          <span class="grow" />
           <template v-if="editable && ev.review_status === 'pending'">
-            <button class="btn btn--sm" type="button" :disabled="busy" @click="review('confirmed')"><Check />Источник верный</button>
+            <button class="btn btn--sm" type="button" :disabled="busy" @click="review('confirmed')"><Check />Верно</button>
             <button class="btn btn--sm btn--ghost" type="button" :disabled="busy" @click="review('rejected')"><X />Не тот</button>
           </template>
+          <Chip v-else-if="ev.review_status !== 'pending'" :tone="EVIDENCE_REVIEW[ev.review_status]?.tone" :text="EVIDENCE_REVIEW[ev.review_status]?.text" />
         </div>
-        <p v-if="ev.review_reason" class="rdetail__where muted">{{ ev.reviewed_by }}: {{ ev.review_reason }}</p>
+        <p v-if="ev.review_reason" class="rdetail__note">{{ ev.reviewed_by }}: {{ ev.review_reason }}</p>
       </template>
       <p v-else class="rdetail__missing">Место в статье не найдено<template v-if="item.source_figure">: значение прочитано с рисунка ({{ item.source_figure }})</template>. Без источника запись не попадёт в строгую выгрузку.</p>
     </section>
@@ -104,26 +110,29 @@ async function remove () {
     <p v-if="item.note && isResult" class="rdetail__note">{{ item.note }}</p>
 
     <footer v-if="editable && !mobile" class="rdetail__actions">
-      <button class="btn btn--sm" type="button" :disabled="busy" @click="emit('edit')"><Pencil />Изменить</button>
+      <button class="btn btn--sm btn--ghost" type="button" :disabled="busy" @click="emit('edit')"><Pencil />Изменить</button>
       <button class="btn btn--sm btn--ghost btn--danger" type="button" :disabled="busy" @click="remove"><Trash2 />Удалить</button>
     </footer>
   </div>
 </template>
 
 <style>
-/* карточка записи: строки панели кита, разделённые линией; значение крупно, подписи тихие */
-.rdetail { display: flex; flex-direction: column; }
-.rdetail > section + section, .rdetail > p + section { margin-top: 14px; padding-top: 14px; box-shadow: inset 0 1px 0 var(--u-line); }
-.rdetail h4 { margin-bottom: 8px; font-size: 13px; line-height: 16px; font-weight: 400; color: var(--u-soft); }
-.rdetail__big { font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: -0.015em; }
+/* карточка записи: только то, чего нет в строке; источник и решение по нему одной строкой */
+.rdetail { display: flex; flex-direction: column; gap: 14px; }
+.rdetail h4 { margin-bottom: 6px; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--u-soft); }
 .rdetail__what { color: var(--u-text-2); }
-.rdetail__raw, .rdetail__note, .rdetail__where { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
-.rdetail__where { margin-top: 8px; }
-.rdetail__review { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.rdetail__raw, .rdetail__note { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--u-muted); }
+.rdetail__line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rdetail__where { font-size: 12px; line-height: 16px; color: var(--u-muted); }
 .rdetail__missing { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--u-bg); box-shadow: inset 0 0 0 1px var(--u-line-2); color: var(--u-text-2); }
 .rdetail__missing::before { content: ""; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--red); flex: none; }
 .rdetail__issues { display: flex; flex-direction: column; gap: 8px; }
 .rdetail__issues h4 { margin-bottom: 0; }
 .rdetail__src .crop { margin-bottom: 4px; }
-.rdetail__actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; box-shadow: inset 0 1px 0 var(--u-line); }
+.rdetail__actions { display: flex; gap: 4px; margin-left: -8px; }
+@media (max-width: 719px) {
+  .rdetail__where { flex-basis: 100%; }
+  .rdetail__line .grow { display: none; }
+  .rdetail__line .btn { flex: 1; }
+}
 </style>

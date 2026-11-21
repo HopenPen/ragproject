@@ -137,7 +137,8 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
 .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .6; flex: none; }
 .chip--plain::before { display: none; }
 .chip--plain { color: var(--u-text-2); background: var(--u-fill); box-shadow: inset 0 0 0 1px var(--u-line); }
-.chip--ok { color: var(--u-soft); box-shadow: inset 0 0 0 1px var(--u-line); }
+/* обычные состояния без рамки: точка и слово; рамка и заливка остаются у того, что ждёт человека */
+.chip--ok { padding: 0; color: var(--u-muted); box-shadow: none; }
 .chip--ok::before { background: var(--u-accent); opacity: 1; }
 .chip--run { color: var(--u-accent-text); background: var(--u-tint); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--u-accent) 22%, transparent); }
 .chip--run::before { width: 8px; height: 8px; background: none; border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent); border-top-color: currentColor; opacity: 1; animation: ui-spin 800ms linear infinite; }
@@ -147,7 +148,7 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
 .chip--warn::before { background: var(--ochre); opacity: 1; }
 .chip--error { color: var(--u-ink); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 45%, transparent); }
 .chip--error::before { background: var(--red); opacity: 1; }
-.chip--off { color: var(--u-soft); box-shadow: inset 0 0 0 1px var(--u-line); }
+.chip--off { padding: 0; color: var(--u-soft); box-shadow: none; }
 
 .count {
   display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
@@ -206,7 +207,7 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
   height: var(--header-h); padding: 0 12px 0 14px; background: var(--u-fill); box-shadow: inset 0 -1px 0 var(--u-line);
 }
 .shell__brand { display: flex; align-items: center; gap: 8px; flex: none; font-weight: 500; color: var(--u-ink); text-decoration: none !important; }
-.shell__body { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 0; }
+.shell__body { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 0; }
 .shell__side { position: sticky; top: var(--header-h); align-self: start; height: calc(100vh - var(--header-h)); overflow: auto; display: flex; flex-direction: column; gap: 1px; padding: 8px; border-right: 1px solid var(--u-line); }
 .shell__main { min-width: 0; min-height: 0; }
 .side__nav {
@@ -215,14 +216,9 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
   transition: background-color 160ms var(--u-ease), color 160ms var(--u-ease);
 }
 .side__nav svg { width: 15px; height: 15px; }
-.side__nav em { margin-left: auto; font-style: normal; color: var(--u-soft); font-variant-numeric: tabular-nums; }
 .side__nav:hover { background: var(--u-fill); color: var(--u-ink); }
 .side__nav.router-link-active, .side__nav.is-on { background: var(--u-fill-2); color: var(--u-ink); font-weight: 500; }
-.side__nav.router-link-active em, .side__nav.is-on em { color: var(--u-muted); }
 .side__nav .count--warn { margin-left: auto; }
-.side__label { margin: 14px 8px 4px; font-size: 13px; line-height: 16px; color: var(--u-soft); }
-.side__hash { width: 15px; text-align: center; color: var(--u-soft); }
-.side__foot { margin-top: auto; padding: 10px 8px 4px; font-size: 12px; line-height: 16px; color: var(--u-soft); }
 
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: 1fr 1fr; height: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--u-fill); box-shadow: inset 0 1px 0 var(--u-line); }
 .tabbar__item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--u-muted); font-size: 12px; font-weight: 500; text-decoration: none !important; }
@@ -236,7 +232,7 @@ body { margin: 0; min-height: 100vh; background: var(--u-bg); color: var(--u-ink
 
 @media (max-width: 1023px) {
   .shell__body { grid-template-columns: 64px minmax(0, 1fr); }
-  .shell__side .side__text, .shell__side .side__label, .shell__side .side__foot, .shell__side em { display: none; }
+  .shell__side .side__text { display: none; }
   .side__nav { justify-content: center; padding: 0; }
 }
 @media (max-width: 719px) {
