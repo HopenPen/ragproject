@@ -26,6 +26,7 @@ export function normalizeDocument(doc, ctx, classification, item) {
   if (cls?.outcome === 'resolved' && cls.labels.length && cls.labels.every(l => cls[l]?.in_scope === false)) status = 'excluded'
   if (item) {
     if (item.status === 'running') status = 'processing'
+    else if (item.status === 'paused') status = 'paused'
     else if (item.status === 'queued') status = 'queued'
     else if (item.status === 'waiting_review') status = 'needs_review'
     else if (item.status === 'failed' && !hasActiveGraph) status = 'failed'

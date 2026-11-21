@@ -1,6 +1,15 @@
 from typing import Literal, Annotated
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from app.schemas.graphs import Strict, Classification, SolarGraph, RagGraph, Bibliography, Scope
+
+
+class Reason(Strict):
+    reason: str = ''
+
+    @field_validator('reason', mode='before')
+    @classmethod
+    def optional_reason(cls, value):
+        return '' if value is None else value.strip() if isinstance(value, str) else value
 
 
 class CorpusCreate(Strict):
@@ -21,7 +30,7 @@ class DocumentPatch(Strict):
     note: str | None = None
 
 
-class JobCreate(Strict):
+class JobCreate(Reason):
     kind: Literal['process', 'classify', 'validate', 'export']
     document_ids: list[str] | None = None
     all_documents: bool = False
@@ -30,7 +39,6 @@ class JobCreate(Strict):
     check_sources: bool = True
     run_external_checker: bool = True
     force: bool = False
-    reason: str | None = None
 
     @model_validator(mode='after')
     def applicable(self):
@@ -45,35 +53,26 @@ class JobCreate(Strict):
             raise ValueError('Validation/export fields are not applicable')
         if self.kind in ('validate', 'export') and fields & {'force', 'reason'}:
             raise ValueError('Force/reason apply only to classification reprocessing')
-        if self.force and not self.reason:
-            raise ValueError('Force requires a reason')
         return self
 
 
-class ClassificationReview(Strict):
+class ClassificationReview(Reason):
     expected_revision: str
     decision: Classification
-    reason: str = Field(min_length=1)
     replace_reviewed: bool = False
 
 
-class GraphWrite(Strict):
+class GraphWrite(Reason):
     graph: Annotated[SolarGraph | RagGraph, Field(discriminator='domain_profile')]
-    reason: str = Field(min_length=1)
 
 
 class PublicationCreate(GraphWrite):
     document_id: str
 
 
-class MetadataPatch(Strict):
+class MetadataPatch(Reason):
     bibliography: Bibliography | None = None
     scope: Scope | None = None
-    reason: str = Field(min_length=1)
-
-
-class Reason(Strict):
-    reason: str = Field(min_length=1)
 
 
 class Review(Reason):

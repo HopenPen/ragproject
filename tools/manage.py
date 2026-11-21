@@ -283,6 +283,7 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('init')
     commands.add_parser('bootstrap')
+    commands.add_parser('reconsider-classifications')
     keys = commands.add_parser('keys'); keys.add_argument('--rotate', action='store_true'); keys.add_argument('--prune-old', action='store_true')
     gateway = commands.add_parser('gateway'); gateway.add_argument('--output', type=Path, default=Path('infra/krakend.json'))
     gateway.add_argument('--production', action='store_true')
@@ -300,6 +301,10 @@ def main():
         bootstrap(Path('.env')); result = {'status': 'created', 'credentials_file': '.env'}
     elif args.command == 'init':
         initialize(config); result = {'status': 'initialized'}
+    elif args.command == 'reconsider-classifications':
+        from app.db import Uow
+        from app.services.classification import reconsider_pending
+        result = reconsider_pending(Uow, config.classification_confidence_threshold)
     elif args.command == 'keys':
         from app.security import create_keys
         create_keys(config, args.rotate)

@@ -79,7 +79,10 @@ def execute(self, item_id):
 
 def schedule_dead_letter(item_id, code):
     with Uow() as u:
-        out = u.repo.find('outbox', item_id=item_id)[0]
+        rows = u.repo.find('outbox', item_id=item_id)
+        if not rows:
+            return
+        out = rows[0]
         u.repo.update('outbox', out['id'], dispatched=False, lease_until=None, task_id=uid(), last_error='dead_letter_pending:'+code)
         u.commit()
 
@@ -92,13 +95,13 @@ def dispatch_once(publisher=None):
         with Uow() as u:
             job = u.repo.get('jobs', job_id, lock=True)
             item = u.repo.get('job_items', item_id, lock=True)
-            if item['status'] != 'running' or not item['lease_until'] or item['lease_until'].replace(tzinfo=timezone.utc) >= now():
+            if not item or not job or item['status'] != 'running' or not item['lease_until'] or item['lease_until'].replace(tzinfo=timezone.utc) >= now():
                 continue
-            state = 'cancelled' if job['status'] == 'cancel_requested' else 'failed' if item['attempts'] >= 4 else 'queued'
+            state = 'cancelled' if job['status'] == 'cancel_requested' else 'paused' if job['status'] in ('paused', 'pause_requested') else 'failed' if item['attempts'] >= 4 else 'queued'
             u.repo.update('job_items', item_id, status=state, lease_token=None, lease_until=None,
                           error='lease_retry_exhausted' if state == 'failed' else item['error'])
             out = u.repo.find('outbox', item_id=item_id)[0]
-            u.repo.update('outbox', out['id'], dispatched=state == 'cancelled', lease_until=None, task_id=uid(),
+            u.repo.update('outbox', out['id'], dispatched=state in ('cancelled', 'paused'), lease_until=None, task_id=uid(),
                           last_error='dead_letter_pending:lease_retry_exhausted' if state == 'failed' else out['last_error'])
             aggregate(u.repo, job_id)
             u.commit()
@@ -109,7 +112,11 @@ def dispatch_once(publisher=None):
             return False
         item = u.repo.get('job_items', out.item_id)
         dead_letter_code = out.last_error.split(':', 1)[1] if out.last_error and out.last_error.startswith('dead_letter_pending:') else None
-        if not dead_letter_code and (item['status'] in TERMINAL or item['status'] == 'waiting_review'):
+        if not item:
+            u.session.delete(out)
+            u.commit()
+            return True
+        if not dead_letter_code and (item['status'] in TERMINAL or item['status'] in ('waiting_review', 'paused')):
             out.dispatched = True
             u.commit()
             return True
@@ -129,7 +136,7 @@ def dispatch_once(publisher=None):
         return False
     with Uow() as u:
         current = u.repo.get('outbox', id, lock=True)
-        if current['task_id'] == task_id:
+        if current and current['task_id'] == task_id:
             u.repo.update('outbox', id, dispatched=True, lease_until=None, last_error=None)
         u.commit()
     return True
@@ -138,9 +145,13 @@ def dispatch_once(publisher=None):
 def start_dispatcher():
     stop = threading.Event()
     def loop():
+        from app.services.deletion import cleanup_storage_once
+        from app.storage import Storage
+        storage = Storage(config)
         while not stop.is_set():
             try:
-                worked = dispatch_once()
+                cleaned = cleanup_storage_once(storage)
+                worked = dispatch_once() or cleaned
             except Exception as exc:
                 log.error('dispatcher_error', extra={'error_code': type(exc).__name__})
                 worked = False

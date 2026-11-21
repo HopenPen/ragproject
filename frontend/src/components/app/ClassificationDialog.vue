@@ -1,7 +1,7 @@
 <!-- Назначение файла: ручное решение по теме статьи (POST /documents/{id}/classifications/review):
-     темы, рамки профиля и обязательная причина. Показывает оценку модели и фрагмент, на который она опиралась. -->
+     темы, рамки профиля и необязательная причина. Показывает оценку модели и фрагмент, на который она опиралась. -->
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import Modal from '../ui/Modal.vue'
 import { documents } from '../../api/index.js'
 import { notify } from '../../stores/toasts.js'
@@ -34,16 +34,14 @@ const TOPICS = [
   { label: 'solar', profile: 'solar-v1', title: 'Солнечные элементы', hint: 'однопереходные тонкоплёночные приборы' },
   { label: 'rag', profile: 'rag-v1', title: 'RAG-системы', hint: 'поиск плюс генерация, с оценкой качества' }
 ]
-const valid = computed(() => reason.value.trim().length > 2)
 async function submit () {
-  if (!valid.value) { error.value = 'Укажите причину решения.'; return }
   busy.value = true
   error.value = ''
   try {
     const sc = {}
     for (const t of TOPICS) if (labels.value.includes(t.label)) sc[t.profile] = scope.value[t.profile]
     await documents.reviewClassification(props.documentId, { expected_revision: cur.value?.revision_id, labels: labels.value, scope: sc, reason: reason.value.trim(), replace_reviewed: cur.value?.origin === 'manual' })
-    notify.ok(labels.value.length ? 'Тема сохранена, обработка продолжается' : 'Статья отмечена как вне тем')
+    notify.ok(labels.value.length ? 'Тема сохранена' : 'Статья отмечена как вне тем')
     kickJobs()
     emit('done')
     emit('close')
@@ -79,7 +77,7 @@ async function submit () {
         <p v-if="!labels.length" class="field__hint">Без отмеченных тем статья попадёт в выгрузку только библиографией.</p>
       </fieldset>
       <label class="field">
-        <span class="field__label">Причина</span>
+        <span class="field__label">Причина<span class="faint">, необязательно</span></span>
         <textarea v-model="reason" class="textarea" rows="2" placeholder="Например: в разделе 2 есть устройство и J-V, тема подтверждена" />
       </label>
       <p v-if="error" class="field__error" role="alert">{{ error }}</p>

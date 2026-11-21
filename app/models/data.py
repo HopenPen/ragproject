@@ -162,3 +162,11 @@ class AuditEntry(Identified, Base):
     action: Mapped[str] = mapped_column(String(64))
     reason: Mapped[str] = mapped_column(Text)
     details: Mapped[dict] = mapped_column(J, default=dict)
+
+
+class StorageDeletion(Identified, Base):
+    __tablename__ = 'storage_deletions'
+    storage_key: Mapped[str] = mapped_column(String(512), unique=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    retry_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=now)
+    last_error: Mapped[str | None] = mapped_column(String(100), nullable=True)

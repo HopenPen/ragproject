@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { normalizeGraph, normalizeClassification, normalizeIssue, normalizeDocument, decodeRecord } from '../src/api/adapters.js'
 import { metricParts, fmtResult } from '../src/lib/format.js'
 import { http, setTokens, clearTokens } from '../src/api/http.js'
-import { publications, catalog } from '../src/api/index.js'
+import { publications, catalog, jobs, corpora, documents } from '../src/api/index.js'
 
 globalThis.window = { location: { origin: 'http://localhost' } }
 
@@ -15,10 +15,32 @@ test('an old model access failure does not hide the accepted scientific graph', 
   assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'failed' }).status, 'ready')
   assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'running' }).status, 'processing')
   assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'queued' }).status, 'queued')
+  assert.equal(normalizeDocument(doc, ctx, null, { ...blocked, status: 'paused' }).status, 'paused')
   const pending = normalizeDocument(doc, { pubs: [], issues: [] }, null, blocked)
   assert.equal(pending.status, 'blocked')
   assert.match(pending.status_hint, /При запуске задания/)
   assert.equal(pending.processing.job_id, 'J1')
+})
+
+test('pause and resume address the same job, while deletion uses explicit DELETE routes', async () => {
+  const previous = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (url, init) => {
+    calls.push({ path: new URL(url).pathname, method: init.method })
+    return init.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ id: 'J1', status: url.endsWith('/pause') ? 'paused' : 'queued' })
+  }
+  try {
+    assert.equal((await jobs.pause('J1')).id, 'J1')
+    assert.equal((await jobs.resume('J1')).id, 'J1')
+    await documents.remove('D1')
+    await corpora.remove('C1')
+    assert.deepEqual(calls, [
+      { path: '/api/v1/jobs/J1/pause', method: 'POST' },
+      { path: '/api/v1/jobs/J1/resume', method: 'POST' },
+      { path: '/api/v1/documents/D1', method: 'DELETE' },
+      { path: '/api/v1/corpora/C1', method: 'DELETE' }
+    ])
+  } finally { globalThis.fetch = previous }
 })
 
 test('server graphs retain source coordinates, nulls, precision and Recall@0', () => {

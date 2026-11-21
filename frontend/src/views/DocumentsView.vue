@@ -3,13 +3,13 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Upload, Play, Tags, RotateCcw } from '@lucide/vue'
+import { Upload, Play, Tags, RotateCcw, Trash2 } from '@lucide/vue'
 import Chip from '../components/ui/Chip.vue'
 import JobBanner from '../components/app/JobBanner.vue'
 import UploadDialog from '../components/app/UploadDialog.vue'
 import { documents, jobs } from '../api/index.js'
-import { ws, kickJobs } from '../stores/workspace.js'
-import { canEdit } from '../stores/session.js'
+import { ws, kickJobs, refreshCorpus } from '../stores/workspace.js'
+import { canEdit, canManage } from '../stores/session.js'
 import { ui } from '../stores/ui.js'
 import { notify } from '../stores/toasts.js'
 import { askReason } from '../stores/dialogs.js'
@@ -24,6 +24,19 @@ const selected = ref(new Set())
 const uploadOpen = ref(false)
 const editable = computed(() => canEdit(ws.corpus))
 const retrying = ref(new Set())
+const deletable = computed(() => canManage(ws.corpus))
+const deleting = ref(new Set())
+async function remove (doc) {
+  const accepted = await askReason({ title: `Удалить статью ${doc.publication_code}?`, text: 'Будут удалены PDF, извлечённые данные и история статьи. Выгрузки, содержащие эту статью, также станут недоступны. Это действие нельзя отменить.', confirm: 'Удалить статью', tone: 'danger', withReason: false })
+  if (!accepted) return
+  deleting.value.add(doc.id)
+  try {
+    await documents.remove(doc.id)
+    selected.value.delete(doc.id)
+    await Promise.all([load(), refreshCorpus()])
+    kickJobs(); notify.ok('Статья удалена')
+  } catch (e) { notify.error(e) } finally { deleting.value.delete(doc.id) }
+}
 
 async function retryBlocked (doc) {
   if (!doc.processing?.job_id || retrying.value.has(doc.id)) return
@@ -49,6 +62,7 @@ watch(() => ws.jobsVersion, () => { clearTimeout(t); t = setTimeout(load, 150) }
 
 const GROUPS = {
   all: { label: 'Все', test: () => true },
+  paused: { label: 'На паузе', test: d => d.status === 'paused' },
   ready: { label: 'Готово', test: d => d.status === 'ready' },
   wait: { label: 'Ждут решения', test: d => d.status === 'needs_review' },
   run: { label: 'В работе', test: d => ['queued', 'processing'].includes(d.status) },
@@ -127,7 +141,7 @@ const tone = d => { const l = d.classification?.labels || []; return l.includes(
     <div v-else class="panel docs__list" :class="{ 'is-picking': selected.size }">
       <div v-if="!ui.mobile" class="docs__cols" aria-hidden="true">
         <span><input v-if="editable" type="checkbox" class="cb docs__all" :checked="allChecked" aria-label="Выбрать все" @change="toggleAll"></span>
-        <span>Статья</span><span>Название</span><span>Статус</span><span class="t-r">Записи</span><span class="t-r">Замеч.</span>
+        <span>Статья</span><span>Название</span><span>Статус</span><span class="t-r">Записи</span><span class="t-r">Замеч.</span><span />
       </div>
       <ul>
         <li v-for="d in shown" :key="d.id" class="docs__row" :class="{ 'is-sel': selected.has(d.id) }" @click="open(d)">
@@ -147,6 +161,7 @@ const tone = d => { const l = d.classification?.labels || []; return l.includes(
           </span>
           <span class="docs__n num">{{ d.records ? fmtNum(d.records, 0) : '' }}</span>
           <span class="docs__n"><span v-if="d.issues_open" class="count count--warn">{{ d.issues_open }}</span></span>
+          <button v-if="deletable" class="btn btn--ghost btn--icon docs__delete" type="button" :aria-label="`Удалить статью ${d.publication_code}`" :disabled="deleting.has(d.id)" @click.stop="remove(d)"><Trash2 /></button>
         </li>
       </ul>
       <p v-if="!shown.length" class="empty">В этом фильтре статей нет.</p>
@@ -164,7 +179,7 @@ const tone = d => { const l = d.classification?.labels || []; return l.includes(
 .docs__filter.is-on { color: var(--u-ink); background: var(--u-fill-2); font-weight: 500; }
 .docs__filter.is-on .num { color: var(--u-muted); }
 .docs__list { overflow: hidden; }
-.docs__cols, .docs__row { display: grid; grid-template-columns: 28px 56px minmax(0, 1fr) 176px 56px 56px; align-items: center; gap: 0 12px; padding: 0 16px; }
+.docs__cols, .docs__row { display: grid; grid-template-columns: 28px 56px minmax(0, 1fr) 176px 56px 56px 32px; align-items: center; gap: 0 12px; padding: 0 16px; }
 .docs__cols { height: 34px; color: var(--u-soft); box-shadow: inset 0 -1px 0 var(--u-line); }
 .docs__cols .t-r { text-align: right; }
 .docs__row { min-height: 44px; padding-top: 6px; padding-bottom: 6px; cursor: pointer; transition: background-color 160ms var(--u-ease); }
@@ -187,10 +202,11 @@ const tone = d => { const l = d.classification?.labels || []; return l.includes(
 @media (max-width: 719px) {
   .page__head .docs__filters { order: 5; flex-basis: 100%; margin: 4px 0 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .docs__filter { flex: none; }
-  .docs__row { grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 10px; padding: 10px 14px; }
+  .docs__row { grid-template-columns: 24px minmax(0, 1fr) auto 32px; grid-template-rows: auto auto; gap: 2px 10px; padding: 10px 14px; }
   .docs__pick { grid-row: 1 / 3; }
   .docs__who { grid-column: 2; grid-row: 1; }
-  .docs__sub { grid-column: 2 / 4; grid-row: 2; }
+  .docs__sub { grid-column: 2 / 5; grid-row: 2; }
+  .docs__delete { grid-column: 4; grid-row: 1; }
   .docs__st { grid-column: 3; grid-row: 1; align-items: flex-end; }
   .docs__n, .docs__stage { display: none; }
 }

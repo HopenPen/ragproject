@@ -24,6 +24,14 @@ class MemoryStorage(Storage):
     def get(self, key):
         return self.files[key]
 
+    def delete(self, key):
+        if key.endswith('/'):
+            for stored in list(self.files):
+                if stored.startswith(key):
+                    self.files.pop(stored, None)
+        else:
+            self.files.pop(key, None)
+
 
 class TestLimiter:
     def check(self, identity):

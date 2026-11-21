@@ -57,7 +57,7 @@ def replace(id: str, body: GraphWrite, response: Response, profile: Profile | No
 def exclude(id: str, body: Reason, response: Response, profile: Profile | None = None, if_match: str | None = Header(None), identity=Depends(actor), rt=Depends(runtime)):
     def change(g):
         return GRAPHS[g['domain_profile']](domain_profile=g['domain_profile'], bibliography=g['bibliography'],
-            scope={'in_scope': False, 'exclusion_reason': body.reason}, evidence=g['evidence'] and [e for e in g['evidence'] if e['entity_id'] is None]).model_dump(mode='json')
+            scope={'in_scope': False, 'exclusion_reason': body.reason or 'Исключено пользователем'}, evidence=g['evidence'] and [e for e in g['evidence'] if e['entity_id'] is None]).model_dump(mode='json')
     return etag(response, rt.catalog.mutate(identity, id, profile, if_match, body.reason, change))
 
 
@@ -87,7 +87,7 @@ def evidence(id: str, response: Response, profile: Profile | None = None, revisi
 
 
 @router.post('/publications/{id}/evidence', status_code=201)
-def add_evidence(id: str, body: Evidence, response: Response, reason: str = Query(..., min_length=1), profile: Profile | None = None,
+def add_evidence(id: str, body: Evidence, response: Response, reason: str = Query(''), profile: Profile | None = None,
                  if_match: str | None = Header(None), identity=Depends(actor), rt=Depends(runtime)):
     def change(g):
         g['evidence'].append(body.model_dump(mode='json'))

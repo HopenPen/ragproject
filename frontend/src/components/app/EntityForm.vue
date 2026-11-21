@@ -69,7 +69,6 @@ async function save () {
   errors.value = {}
   common.value = ''
   if (!dirty.value) { common.value = 'Нет изменений.'; return }
-  if (reason.value.trim().length < 3) { errors.value.reason = 'Укажите причину: она попадёт в историю версий.'; return }
   busy.value = true
   try {
     const body = { profile: props.profile, reason: reason.value.trim(), values: changed.value }
@@ -124,7 +123,7 @@ const title = computed(() => props.mode === 'create' ? `Новая запись:
         </div>
       </details>
       <label class="field eform__reason">
-        <span class="field__label">Причина правки</span>
+        <span class="field__label">Причина правки<span class="faint">, необязательно</span></span>
         <textarea v-model="reason" class="textarea" rows="2" :aria-invalid="!!errors.reason" placeholder="Например: в таблице 1 указано 78.0, модель прочитала 75.0" />
         <span v-if="errors.reason" class="field__error">{{ errors.reason }}</span>
         <span v-else class="field__hint">Сохранение создаст новую версию графа. Прежняя останется в истории.</span>

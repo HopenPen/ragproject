@@ -60,6 +60,18 @@ class Storage:
             raise Error(502, 'storage_integrity', 'Stored object checksum mismatch')
         return data
 
+    def delete(self, key):
+        if not key.endswith('/'):
+            self.client.delete_object(Bucket=self.config.s3_bucket, Key=key)
+            return
+        paginator = self.client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=self.config.s3_bucket, Prefix=key):
+            objects = [{'Key': obj['Key']} for obj in page.get('Contents', [])]
+            if objects:
+                result = self.client.delete_objects(Bucket=self.config.s3_bucket, Delete={'Objects': objects, 'Quiet': True})
+                if result.get('Errors'):
+                    raise Error(503, 'storage_delete_failed', 'Some stored objects could not be deleted')
+
     def inspect_pdf(self, data):
         if len(data) > self.config.max_pdf_bytes:
             raise Error(413, 'pdf_too_large', 'PDF exceeds configured byte limit')

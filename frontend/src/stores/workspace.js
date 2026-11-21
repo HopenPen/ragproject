@@ -52,7 +52,7 @@ async function pollOnce () {
   if (!pollCorpus) return
   try {
     const list = await jobs.list(pollCorpus)
-    const active = list.items.filter(j => !TERMINAL.has(j.status) && j.status !== 'waiting_review')
+    const active = list.items.filter(j => !TERMINAL.has(j.status) && !['waiting_review', 'paused'].includes(j.status))
     const changed = JSON.stringify(list.items.map(j => [j.id, j.status, j.stage, j.counters, j.progress])) !== JSON.stringify(ws.jobs.map(j => [j.id, j.status, j.stage, j.counters, j.progress]))
     ws.jobs = list.items
     if (changed) ws.jobsVersion++

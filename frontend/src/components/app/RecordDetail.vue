@@ -40,7 +40,7 @@ async function review (decision) {
   if (reason === null) return
   busy.value = true
   try {
-    const res = await publications.reviewEvidence(props.publicationId, ev.value.evidence_id, { decision, reason: reason || 'Сверено с PDF', profile: props.profile }, props.etag)
+    const res = await publications.reviewEvidence(props.publicationId, ev.value.evidence_id, { decision, reason, profile: props.profile }, props.etag)
     notify.ok(decision === 'confirmed' ? 'Источник подтверждён' : 'Источник отклонён')
     emit('changed', res)
   } catch (e) {
@@ -51,7 +51,7 @@ async function review (decision) {
 async function remove () {
   const id = props.item[ID_FIELD[props.type]]
   const reason = await askReason({ title: `Удалить запись ${id}?`, text: 'Запись исчезнет из активной версии графа. Прежние версии и аудит сохранят её.', confirm: 'Удалить', tone: 'danger', placeholder: 'Например: дубль результата R3' })
-  if (!reason) return
+  if (reason === null) return
   busy.value = true
   try {
     const res = await publications.deleteEntity(props.publicationId, props.type, id, { profile: props.profile, reason }, props.etag)

@@ -94,10 +94,16 @@ async function toError (res) {
   let body = null
   try { body = await res.json() } catch { /* пустое тело у шлюза */ }
   const err = body?.error || {}
+  const messages = {
+    processing_active: 'Сначала приостановите или отмените обработку и дождитесь её остановки. Затем повторите удаление.',
+    job_not_paused: 'Дождитесь завершения текущего этапа и перехода задания на паузу.',
+    job_not_active: 'Задание уже завершено.',
+    pause_not_supported: 'Пауза доступна для обработки PDF и определения темы.'
+  }
   return new ApiError({
     status: res.status,
     code: err.code || `http_${res.status}`,
-    message: err.message || STATUS_TEXT[res.status] || `Ошибка ${res.status}`,
+    message: messages[err.code] || err.message || STATUS_TEXT[res.status] || `Ошибка ${res.status}`,
     details: err.details || null,
     requestId: err.request_id || res.headers.get('x-request-id') || null
   })

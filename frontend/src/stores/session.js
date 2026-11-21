@@ -60,7 +60,11 @@ export async function logout ({ everywhere = false } = {}) {
 
 /** Может ли текущий пользователь менять корпус: редактор-владелец или администратор, корпус не в архиве. */
 export function canEdit (corpus) {
+  return corpus?.status !== 'archived' && canManage(corpus)
+}
+
+export function canManage (corpus) {
   const u = session.user
-  if (!u || !corpus || corpus.status === 'archived') return false
+  if (!u || !corpus) return false
   return u.role === 'admin' || (u.role === 'editor' && corpus.owner_id === u.id)
 }

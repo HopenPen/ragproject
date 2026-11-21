@@ -11,6 +11,7 @@ router = APIRouter(prefix='/api/v1', tags=['Processing and immutable snapshot jo
 @router.get('/processing/configuration')
 def configuration(identity=Depends(actor), rt=Depends(runtime)):
     return {'model_id': rt.config.model_id, 'configured': bool(rt.config.openai_api_key.get_secret_value()),
+            'classification_confidence_threshold': rt.config.classification_confidence_threshold,
             'pipeline_version': PIPELINE_VERSION, 'rules_version': RULES_VERSION,
             'limits': {'max_pdf_bytes': rt.config.max_pdf_bytes, 'max_pdf_pages': rt.config.max_pdf_pages, 'model_max_calls': rt.config.model_max_calls}}
 
@@ -50,6 +51,16 @@ def cancel(id: str, identity=Depends(actor), rt=Depends(runtime)):
 @router.post('/jobs/{id}/retry', status_code=202)
 def retry(id: str, response: Response, idempotency_key: str | None = Header(None), identity=Depends(actor), rt=Depends(runtime)):
     return accepted(rt.jobs.retry(identity, id, idempotency_key), response)
+
+
+@router.post('/jobs/{id}/pause')
+def pause(id: str, identity=Depends(actor), rt=Depends(runtime)):
+    return public_record(rt.jobs.pause(identity, id))
+
+
+@router.post('/jobs/{id}/resume')
+def resume(id: str, identity=Depends(actor), rt=Depends(runtime)):
+    return public_record(rt.jobs.resume(identity, id))
 
 
 @router.get('/jobs/{id}/report')

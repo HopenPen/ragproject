@@ -1,3 +1,4 @@
+import copy
 import re
 from collections import defaultdict
 from decimal import Decimal
@@ -19,6 +20,46 @@ def typed_graph(value):
         return GRAPHS[profile].model_validate(value).model_dump(mode='json')
     except ValidationError as exc:
         raise Error(422, 'invalid_graph', 'Invalid graph schema', exc.errors(include_context=False))
+
+
+def machine_graph(value):
+    """Preserve non-scalar model numbers as text; manual writes remain strictly typed."""
+    try:
+        return typed_graph(value)
+    except Error as exc:
+        if exc.code != 'invalid_graph':
+            raise
+        errors = exc.details
+    graph = copy.deepcopy(value)
+    collections = {collection: dto for profile, collection, _, dto in ENTITIES.values()
+                   if profile == graph['domain_profile']}
+    repaired = False
+    for error in errors:
+        if error['type'] not in ('decimal_parsing', 'decimal_type', 'finite_number', 'int_parsing', 'int_type', 'int_from_float'):
+            continue
+        path = error['loc']
+        if len(path) != 3:
+            continue
+        collection, index, field = path
+        dto = collections.get(collection)
+        if dto is None or 'note' not in dto.model_fields or field not in dto.model_fields or dto.model_fields[field].default is not None:
+            continue
+        row = graph[collection][index]
+        original = error['input']
+        row[field] = None
+        note = f'Исходное значение {field}: {original}. Требует проверки по источнику.'
+        if note not in (row.get('note') or ''):
+            row['note'] = (row.get('note') + '\n' if row.get('note') else '') + note
+        if collection == 'results' and field in ('metric_value', 'normalized_value'):
+            if not row.get('raw_value'):
+                row['raw_value'] = str(original)
+                row['raw_unit'] = row.get('raw_unit') or row.get('metric_unit') or row.get('normalized_unit')
+            row.update(metric_value=None, normalized_value=None, metric_unit=None, normalized_unit=None,
+                       extraction_status='present_not_extractable')
+        repaired = True
+    if not repaired:
+        return typed_graph(value)
+    return typed_graph(graph)
 
 
 def structural(graph, page_count=None):
@@ -57,11 +98,11 @@ def structural(graph, page_count=None):
             errors.append(issue('schema', 'Duplicate evidence id', severity='error'))
         ev_ids.add(ev['evidence_id'])
         if ev['entity_id'] is not None and ev['entity_id'] not in all_ids:
-            errors.append(issue('links', 'Evidence references missing entity', severity='error'))
+            errors.append(issue('links', 'Evidence references missing entity', severity='error', evidence_id=ev['evidence_id'], entity_id=ev['entity_id'], source_page=ev['source_page']))
         entity = next((row for collection in collections.values() for entity_id, row in collection.items() if entity_id == ev['entity_id']), None)
         field = re.split(r'[.\[\]/]', ev['field_path'])[-1]
         if not field or (entity and field not in entity) or (not entity and ev['field_path'].split('.')[0] not in ('bibliography', 'scope')):
-            errors.append(issue('links', 'Evidence field_path does not identify a graph/entity field', severity='error'))
+            errors.append(issue('links', 'Evidence field_path does not identify a graph/entity field', severity='error', evidence_id=ev['evidence_id'], entity_id=ev['entity_id'], field_path=ev['field_path'], source_page=ev['source_page']))
         elif not entity:
             cursor = graph
             for part in ev['field_path'].split('.'):

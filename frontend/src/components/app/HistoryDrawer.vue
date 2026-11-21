@@ -52,7 +52,7 @@ async function activate (v) {
     confirm: 'Сделать активной',
     placeholder: 'Например: повторное извлечение нашло Jsc и FF прибора D1'
   })
-  if (!reason) return
+  if (reason === null) return
   busy.value = true
   try {
     const res = await publications.activate(props.publicationId, v.revision_id, props.profile, props.etag, reason)

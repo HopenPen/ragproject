@@ -11,7 +11,7 @@ PROFILES = ('solar-v1', 'rag-v1')
 TERMINAL = {'succeeded', 'partially_succeeded', 'failed', 'cancelled', 'blocked_external_configuration'}
 PIPELINE_VERSION = '3.0.0'
 RULES_VERSION = '1.0.0'
-PROMPT_VERSION = '1.0.1'
+PROMPT_VERSION = '1.0.2'
 
 
 class Error(Exception):

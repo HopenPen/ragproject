@@ -304,6 +304,11 @@ const progress = computed(() => doc.value?.processing?.progress?.total ? doc.val
             <p>{{ cls?.note || 'Файл повреждён или защищён паролем.' }}</p>
             <p class="muted">Загрузите исправный файл под тем же кодом статьи или отметьте пропуск в выгрузке.</p>
           </template>
+          <template v-else-if="state === 'paused'">
+            <span class="art__mark" aria-hidden="true" />
+            <h2>Обработка приостановлена</h2>
+            <p>Прогресс сохранён. Продолжить задание можно на странице документов.</p>
+          </template>
           <template v-else-if="state === 'blocked'">
             <span class="art__mark art__mark--warn" aria-hidden="true" />
             <h2>Нужен повтор обработки</h2>

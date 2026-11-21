@@ -3,11 +3,11 @@ from uuid import UUID
 from sqlalchemy.inspection import inspect
 from app.models.auth import User, RefreshSession
 from app.models.data import (Corpus, Document, Page, Artifact, Job, JobItem, Outbox, Publication,
-                             PublicationRevision, ClassificationRevision, Issue, AuditEntry)
+                             PublicationRevision, ClassificationRevision, Issue, AuditEntry, StorageDeletion)
 from app.repositories.auth import AuthRepository
 
 TABLES = {c.__tablename__: c for c in (User, RefreshSession, Corpus, Document, Page, Artifact, Job, JobItem,
-          Outbox, Publication, PublicationRevision, ClassificationRevision, Issue, AuditEntry)}
+          Outbox, Publication, PublicationRevision, ClassificationRevision, Issue, AuditEntry, StorageDeletion)}
 
 
 def mapping(obj):

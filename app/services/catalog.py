@@ -135,7 +135,7 @@ class Documents:
                         continue
                     u.repo.update('jobs',job['id'],status='cancel_requested')
                     for item in u.repo.find('job_items',job_id=job['id']):
-                        if item['status'] in ('queued','waiting_review'):
+                        if item['status'] in ('queued','waiting_review','paused'):
                             u.repo.update('job_items',item['id'],status='cancelled')
                     aggregate(u.repo,job['id'])
             result = u.repo.update('corpora', id, **values, revision=corpus['revision']+1)

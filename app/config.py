@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     admin_password: SecretStr = SecretStr('')
     openai_api_key: SecretStr = SecretStr('')
     openai_base_url: str = 'https://api.proxyapi.ru/v1'
-    model_id: str = 'openai/gpt-6.1-terra'
+    model_id: str = 'openai/gpt-5.6-luna'
+    classification_confidence_threshold: float = Field(.85, ge=0, le=1)
     max_pdf_bytes: int = Field(100 * 1024 * 1024, gt=0)
     max_pdf_pages: int = Field(300, gt=0)
     model_timeout: float = 180

@@ -154,9 +154,9 @@ def test_strict_export_rejects_missing_classification(env,corpus):
 
 def test_request_forbids_model_override_and_inapplicable_fields():
     for payload in ({'kind':'process','all_documents':True,'model_id':'custom'},
-                    {'kind':'classify','all_documents':True,'target_profiles':['solar-v1']},
-                    {'kind':'process','all_documents':True,'force':True}):
+                    {'kind':'classify','all_documents':True,'target_profiles':['solar-v1']}):
         with pytest.raises(Exception):JobCreate.model_validate(payload)
+    assert JobCreate(kind='process', all_documents=True, force=True).reason == ''
     schema=strict_schema(ClassificationSchema())
     assert schema['additionalProperties'] is False
 

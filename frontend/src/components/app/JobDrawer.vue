@@ -1,7 +1,7 @@
 <!-- Назначение файла: подробности задания: этап каждой статьи, ошибки, отмена между этапами и повтор упавших. -->
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RotateCcw, CircleStop } from '@lucide/vue'
+import { RotateCcw, CircleStop, Pause, Play } from '@lucide/vue'
 import Drawer from '../ui/Drawer.vue'
 import Chip from '../ui/Chip.vue'
 import Progress from '../ui/Progress.vue'
@@ -32,6 +32,16 @@ watch(() => ws.jobsVersion, () => { if (props.open) load() })
 const active = computed(() => job.value && !TERMINAL.has(job.value.status))
 const retryable = computed(() => items.value.some(i => ['failed', 'cancelled', 'blocked_external_configuration'].includes(i.status)) || ['failed', 'cancelled'].includes(job.value?.status))
 const editable = computed(() => canEdit(ws.corpus))
+const pausable = computed(() => job.value && ['process', 'classify'].includes(job.value.kind) && ['queued', 'running', 'waiting_review'].includes(job.value.status))
+async function changePause () {
+  busy.value = true
+  try {
+    const resume = job.value.status === 'paused'
+    await (resume ? jobs.resume(job.value.id) : jobs.pause(job.value.id))
+    notify.info(resume ? 'Обработка продолжена с сохранённого места' : 'Пауза запрошена: текущий этап завершится и сохранится')
+    kickJobs(); await load()
+  } catch (e) { notify.error(e) } finally { busy.value = false }
+}
 async function cancel () {
   busy.value = true
   try { await jobs.cancel(job.value.id); notify.info('Отмена запрошена: текущий этап закончится, остальные статьи не начнутся'); kickJobs(); load() } catch (e) { notify.error(e) } finally { busy.value = false }
@@ -54,6 +64,8 @@ function itemProgress (i) {
       </p>
     </template>
     <div v-if="job" class="stack jd">
+      <p v-if="job.status === 'pause_requested'" class="muted">Текущий этап или запрос к модели завершится и сохранится. Следующие файлы не начнутся.</p>
+      <p v-if="job.status === 'paused'" class="muted">Прогресс сохранён. Нажмите «Продолжить», чтобы возобновить обработку.</p>
       <p v-if="job.error" class="jd__error">{{ job.error.message }}</p>
       <table v-if="items.length" class="table jd__table">
         <thead><tr><th>Код</th><th>Этап</th><th>Статус</th></tr></thead>
@@ -73,6 +85,8 @@ function itemProgress (i) {
     </div>
     <div v-else class="skeleton" style="height: 240px" />
     <template v-if="job && editable && (active || retryable)" #footer>
+      <button v-if="pausable" class="btn" type="button" :disabled="busy" @click="changePause"><Pause />Приостановить</button>
+      <button v-if="job.status === 'paused'" class="btn btn--primary" type="button" :disabled="busy" @click="changePause"><Play />Продолжить</button>
       <button v-if="active" class="btn" type="button" :disabled="busy || job.status === 'cancel_requested'" @click="cancel"><CircleStop />Отменить</button>
       <button v-if="!active && retryable" class="btn btn--primary" type="button" :disabled="busy" @click="retry"><RotateCcw />Повторить упавшие</button>
     </template>

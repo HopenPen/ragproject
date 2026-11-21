@@ -44,6 +44,7 @@ export const reference = {
   rules: async id => (await http.get(`/domain-profiles/${enc(id)}/rules`)).data.rules
 }
 export const corpora = {
+  remove: async id => { await http.del(`/corpora/${enc(id)}`); invalidate() },
   list: async () => { const list = await all('/corpora'); return { ...list, items: list.items.map(normalizeCorpus).reverse() } },
   get: async id => normalizeCorpus((await http.get(`/corpora/${enc(id)}`)).data),
   create: async body => { invalidate(); return normalizeCorpus((await http.post('/corpora', body)).data) },
@@ -64,6 +65,7 @@ async function decoratedDocs(c) {
   }))
 }
 export const documents = {
+  remove: async id => { await http.del(`/documents/${enc(id)}`); invalidate() },
   list: async id => { const c = await context(id); const items = await decoratedDocs(c); return { items, total: items.length } },
   get: async id => { const doc = (await http.get(`/documents/${enc(id)}`)).data; const c = await context(doc.corpus_id); return (await decoratedDocs({ ...c, docs: [doc] }))[0] },
   upload: async (id, file, code, onProgress) => { const fd = new FormData(); fd.append('file', file, file.name); fd.append('publication_code', code); const r = await upload(`/corpora/${enc(id)}/documents`, fd, { onProgress }); invalidate(); return { ...r.data, _duplicate: r.status === 200 } },
@@ -86,6 +88,8 @@ async function jobDetails(job) {
   return normalizeJob(detail.data, list.items)
 }
 export const jobs = {
+  pause: async id => { const r = await http.post(`/jobs/${enc(id)}/pause`); invalidate(); return r.data },
+  resume: async id => { const r = await http.post(`/jobs/${enc(id)}/resume`); invalidate(); return r.data },
   list: async (id, query = {}) => { const r = await all(`/corpora/${enc(id)}/jobs`); const rows = r.items.filter(j => !query.kind || query.kind === j.kind).sort((a, b) => b.created_at.localeCompare(a.created_at)); return { ...r, items: rows.map(j => normalizeJob(j)) } },
   get: async id => jobDetails({ id }),
   items: async id => { const r = await all(`/jobs/${enc(id)}/items`); const job = (await http.get(`/jobs/${enc(id)}`)).data; const c = await context(job.corpus_id); return r.items.map(i => ({ ...i, publication_code: c.docs.find(d => d.id === i.document_id)?.publication_code, error: i.error ? { message: i.error } : null })) },
@@ -136,6 +140,6 @@ export const catalog = {
   },
   issues: async (id, query = {}) => { const { status, publication_id, ...filters } = query; const [r, c] = await Promise.all([all(`/corpora/${enc(id)}/issues`, { ...filters, review: status, publication: publication_id }), context(id)]); const items = r.items.map(i => normalizeIssue(i, c)); items.forEach(i => issueTags.set(i.id, i._etag)); return { ...r, items, skipped: [] } },
   issue: async id => { const r = await http.get(`/issues/${enc(id)}`); issueTags.set(id, r.etag); return normalizeIssue(r.data) },
-  reviewIssue: async (id, body, etag = issueTags.get(id)) => { if (!etag) throw new Error('Обновите замечание перед изменением'); const r = await http.patch(`/issues/${enc(id)}`, { review: body.status, reason: body.reason || 'Возвращено на проверку' }, { ifMatch: etag }); issueTags.set(id, r.etag); invalidate(); return normalizeIssue(r.data) },
+  reviewIssue: async (id, body, etag = issueTags.get(id)) => { if (!etag) throw new Error('Обновите замечание перед изменением'); const r = await http.patch(`/issues/${enc(id)}`, { review: body.status, reason: body.reason ?? '' }, { ifMatch: etag }); issueTags.set(id, r.etag); invalidate(); return normalizeIssue(r.data) },
   reviewItems: async (id, query) => { const [r, c] = await Promise.all([all(`/corpora/${enc(id)}/review-items`, query), context(id)]); return { ...r, items: r.items.map((it, i) => { const pub = c.pubs.find(p => p.id === it.publication_id); const doc = c.docs.find(d => d.id === (it.document_id || pub?.document_id)); return { ...it, id: `${it.kind}:${it.revision_id || it.entity_id || i}`, document_id: doc?.id, publication_code: doc?.publication_code, title: doc?.display_name, summary: it.kind === 'classification' ? 'Проверьте тему статьи' : it.kind === 'candidate' ? 'Сравните новую версию с активной' : 'Проверьте извлечённые данные' } }) } }
 }

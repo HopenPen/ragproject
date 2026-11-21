@@ -3,19 +3,24 @@ import hashlib
 import json
 from datetime import timedelta, timezone
 from app.domain import (Error, ExternalConfiguration, TransientError, TERMINAL, PROFILES, now, uid, digest,
-                        corpus_access, precondition, PIPELINE_VERSION, PROMPT_VERSION, RULES_VERSION, quote_normalize, UNITS, normalize_value)
+                        corpus_access, precondition, PIPELINE_VERSION, PROMPT_VERSION, RULES_VERSION, UNITS, normalize_value)
+from app.services.classification import automatic_decision
 from app.profiles import GRAPHS
 from app.schemas.graphs import Classification
 from app.services.catalog import document, publication, save_revision, touch
-from app.services.validation import typed_graph, structural, source_checks, validate
+from app.services.validation import machine_graph, structural, source_checks, validate
 
 
 def aggregate(repo, job_id):
     job = repo.get('jobs', job_id, lock=True)
     items = repo.find('job_items', job_id=job_id)
     states = [i['status'] for i in items]
-    if job['status'] == 'cancel_requested':
+    if not states:
+        status = 'cancelled'
+    elif job['status'] == 'cancel_requested':
         status = 'cancelled' if all(s in TERMINAL for s in states) else 'cancel_requested'
+    elif job['status'] in ('pause_requested', 'paused') and any(s not in TERMINAL for s in states):
+        status = 'pause_requested' if 'running' in states else 'paused'
     elif 'running' in states:
         status = 'running'
     elif 'waiting_review' in states:
@@ -114,8 +119,60 @@ class Jobs:
                 return job
             u.repo.update('jobs', job_id, status='cancel_requested')
             for item in u.repo.find('job_items', job_id=job_id):
-                if item['status'] in ('queued', 'waiting_review'):
+                if item['status'] in ('queued', 'waiting_review', 'paused'):
                     u.repo.update('job_items', item['id'], status='cancelled')
+            aggregate(u.repo, job_id)
+            u.commit()
+            return u.repo.get('jobs', job_id)
+
+    def pause(self, actor, job_id):
+        with self.uow() as u:
+            job = u.repo.get('jobs', job_id)
+            if not job:
+                raise Error(404, 'not_found', 'Job not found')
+            corpus_access(u.repo.get('corpora', job['corpus_id'], lock=True), actor, True)
+            job = u.repo.get('jobs', job_id, lock=True)
+            if job['kind'] not in ('process', 'classify'):
+                raise Error(409, 'pause_not_supported', 'Only document processing/classification can be paused')
+            if job['status'] in ('pause_requested', 'paused'):
+                return job
+            if job['status'] in TERMINAL or job['status'] == 'cancel_requested':
+                raise Error(409, 'job_not_active', 'Job is no longer active')
+            u.repo.update('jobs', job_id, status='pause_requested')
+            for item in u.repo.find('job_items', job_id=job_id):
+                item = u.repo.get('job_items', item['id'], lock=True)
+                if item['status'] in ('queued', 'waiting_review'):
+                    u.repo.update('job_items', item['id'], status='paused',
+                                  progress={**item['progress'], '_resume_status': item['status']})
+            aggregate(u.repo, job_id)
+            u.commit()
+            return u.repo.get('jobs', job_id)
+
+    def resume(self, actor, job_id):
+        with self.uow() as u:
+            job = u.repo.get('jobs', job_id)
+            if not job:
+                raise Error(404, 'not_found', 'Job not found')
+            corpus_access(u.repo.get('corpora', job['corpus_id'], lock=True), actor, True)
+            job = u.repo.get('jobs', job_id, lock=True)
+            if job['status'] in ('queued', 'running', 'waiting_review'):
+                return job
+            if job['status'] in TERMINAL or job['status'] == 'cancel_requested':
+                raise Error(409, 'job_not_active', 'Job is no longer active')
+            if job['status'] != 'paused':
+                raise Error(409, 'job_not_paused', 'Wait until the current operation has paused')
+            for item in u.repo.find('job_items', job_id=job_id):
+                item = u.repo.get('job_items', item['id'], lock=True)
+                if item['status'] != 'paused':
+                    continue
+                progress = copy.deepcopy(item['progress'])
+                state = progress.pop('_resume_status', 'queued')
+                progress['_resuming'] = item['attempts'] > 0
+                u.repo.update('job_items', item['id'], status=state, progress=progress, lease_token=None, lease_until=None)
+                if state == 'queued':
+                    out = u.repo.find('outbox', item_id=item['id'])[0]
+                    u.repo.update('outbox', out['id'], dispatched=False, lease_until=None, task_id=uid(), last_error=None)
+            u.repo.update('jobs', job_id, status='queued')
             aggregate(u.repo, job_id)
             u.commit()
             return u.repo.get('jobs', job_id)
@@ -140,7 +197,7 @@ class Jobs:
         decision = copy.deepcopy(decision)
         for label in ('solar', 'rag'):
             if decision[label]['in_scope'] is False and not decision[label]['exclusion_reason']:
-                decision[label]['exclusion_reason'] = reason
+                decision[label]['exclusion_reason'] = reason or 'Исключено пользователем'
         with self.uow() as u:
             doc = document(u.repo, doc_id, actor, True)
             precondition(expected, doc['classification_id'] or 'none')
@@ -172,10 +229,16 @@ class Jobs:
                     pub = u.repo.get('publications', pub['id'])
             u.repo.add('audit_entries', corpus_id=doc['corpus_id'], document_id=doc_id, publication_id=pub['id'],
                        author_id=actor['id'], action='classification_review', reason=reason, details={'revision_id': cls['id']})
-            for item in u.repo.find('job_items', document_id=doc_id, status='waiting_review'):
+            for item in u.repo.find('job_items', document_id=doc_id, status=['waiting_review', 'paused']):
                 job = u.repo.get('jobs', item['job_id'], lock=True)
                 item = u.repo.get('job_items', item['id'], lock=True)
-                if job['status'] == 'cancel_requested' or item['status'] != 'waiting_review':
+                if job['status'] == 'cancel_requested':
+                    continue
+                if item['status'] == 'paused':
+                    if item['progress'].get('_resume_status') == 'waiting_review':
+                        u.repo.update('job_items', item['id'], stage='extract', progress={**item['progress'], '_resume_status': 'queued'})
+                    continue
+                if item['status'] != 'waiting_review':
                     continue
                 u.repo.update('job_items', item['id'], status='queued', stage='extract')
                 out = u.repo.find('outbox', item_id=item['id'])[0]
@@ -189,6 +252,9 @@ class Jobs:
 class Cancelled(Exception):
     pass
 
+class Paused(Exception):
+    pass
+
 
 def normalize_results(graph):
     for result in graph['results']:
@@ -197,6 +263,18 @@ def normalize_results(graph):
         result.update(normalized_value=str(value) if value is not None else None, normalized_unit=target if value is not None else None,
                       metric_value=str(value) if value is not None else None, metric_unit=target if value is not None else None)
     return graph
+
+
+def merge_extraction_graph(previous, updated):
+    from app.profiles import ENTITIES
+    if updated['domain_profile'] != previous['domain_profile'] or updated['scope']['in_scope'] is not True:
+        raise Error(422, 'profile_mismatch', 'Extraction changed accepted profile/scope')
+    collections = [(collection, key) for profile, collection, key, _ in ENTITIES.values()
+                   if profile == previous['domain_profile']] + [('evidence', 'evidence_id')]
+    for collection, key in collections:
+        present = {row[key] for row in updated[collection]}
+        updated[collection] = [row for row in previous[collection] if row[key] not in present] + updated[collection]
+    return updated
 
 
 def machine_evidence(value):
@@ -222,14 +300,17 @@ class Runner:
     def checkpoint(self, item_id, token, progress, stage, check_cancel=True):
         with self.uow() as u:
             item = u.repo.get('job_items', item_id, lock=True)
-            if item['lease_token'] != token:
+            if not item or item['lease_token'] != token:
                 raise Cancelled()
             job = u.repo.get('jobs', item['job_id'])
             u.repo.update('job_items', item_id, progress=copy.deepcopy(progress), stage=stage,
                           lease_until=now()+timedelta(seconds=max(self.config.lease_seconds, (self.config.model_timeout+15)*(self.config.max_retries+1))))
             u.commit()
-            if check_cancel and job['status'] == 'cancel_requested':
-                raise Cancelled()
+            if check_cancel:
+                if job['status'] == 'cancel_requested':
+                    raise Cancelled()
+                if job['status'] in ('pause_requested', 'paused'):
+                    raise Paused()
 
     def model_call(self, item_id, token, progress, key, purpose, schema, pages, context):
         outputs = progress.setdefault('outputs', {})
@@ -294,7 +375,8 @@ class Runner:
             doc = u.repo.get('documents', doc_id)
             cls = u.repo.get('classification_revisions', doc['classification_id']) if doc['classification_id'] else None
         # Reviewed classifications survive reprocessing and resume waiting jobs.
-        preserve = cls and cls['reviewed'] and (not job['input'].get('force') or item['stage'] == 'extract')
+        preserve = cls and ((cls['reviewed'] and (not job['input'].get('force') or item['stage'] == 'extract')) or
+                            (item['stage'] == 'extract' and progress.get('classification_revision_id') == cls['id']))
         if not preserve:
             observations = []
             for start in range(0, len(pages), self.config.page_batch_size):
@@ -304,20 +386,16 @@ class Runner:
                 observations.append(Classification.model_validate(obs).model_dump(mode='json'))
             decision = self.model_call(item['id'], token, progress, 'classify-final', 'classify', Classification.model_json_schema(), [],
                                       {'observations': observations, 'total_pages': doc['page_count'], 'coverage': progress['coverage'], 'aggregate_all_observations': True})
-            decision = machine_evidence(Classification.model_validate(decision).model_dump(mode='json'))
-            verified = bool(decision['evidence']) and all(
-                e['source_page'] <= doc['page_count'] and e.get('fragment') and quote_normalize(e['fragment']) and
-                any(p['number'] == e['source_page'] and quote_normalize(e['fragment']) in quote_normalize(p['text']) for p in pages)
-                for e in decision['evidence'])
-            if decision['outcome'] in ('resolved', 'outside') and (decision['confidence'] < .85 or not verified or
-                    any(decision[label]['in_scope'] is None for label in decision['labels'])):
-                decision['outcome'] = 'needs_review'
+            decision = automatic_decision(machine_evidence(Classification.model_validate(decision).model_dump(mode='json')),
+                                          self.config.classification_confidence_threshold)
             with self.uow() as u:
                 u.repo.get('corpora', doc['corpus_id'], lock=True)
                 latest_job = u.repo.get('jobs', job['id'], lock=True)
                 latest_item = u.repo.get('job_items', item['id'], lock=True)
                 if latest_item['lease_token'] != token or latest_job['status'] == 'cancel_requested':
                     raise Cancelled()
+                if latest_job['status'] in ('pause_requested', 'paused'):
+                    raise Paused()
                 existing = u.repo.find('classification_revisions', document_id=doc_id, run_id=item['id'])
                 if existing:
                     cls = existing[0]
@@ -326,6 +404,7 @@ class Runner:
                     cls = u.repo.add('classification_revisions', document_id=doc_id, number=max([r['number'] for r in revisions], default=0)+1,
                                      decision=decision, reason=job['input'].get('reason') or 'Model classification', run_id=item['id'],
                                      provenance={'model':progress.get('model'), 'pipeline_version':PIPELINE_VERSION, 'prompt_version':PROMPT_VERSION,
+                                                 'acceptance_policy':'confidence-threshold-v1', 'confidence_threshold':self.config.classification_confidence_threshold,
                                                  'schema_version':'1.0.0', 'coverage':progress['coverage'],
                                                  'calls':[{k:v for k,v in out.items() if k!='output'} for name,out in progress.get('outputs',{}).items() if name.startswith('classify')]})
                 current_doc = u.repo.get('documents', doc_id)
@@ -357,16 +436,11 @@ class Runner:
                 for start in range(0, len(pages), self.config.page_batch_size):
                     batch = self.batch(pages[start:start+self.config.page_batch_size], artifacts)
                     output = self.model_call(item['id'], token, progress, f'{profile}-{start}', 'extract', GRAPHS[profile].model_json_schema(), batch,
-                         {'domain_profile': profile, 'total_pages': doc['page_count'], 'existing_graph': graph, 'classification': decision})
-                    updated_graph = typed_graph(output)
-                    # Later batches may add/refine entities but cannot silently drop earlier facts.
-                    from app.profiles import ENTITIES
-                    for p, collection, id_field, dto in ENTITIES.values():
-                        if p == profile and not {r[id_field] for r in graph[collection]} <= {r[id_field] for r in updated_graph[collection]}:
-                            raise Error(422, 'partial_model_output', 'Later extraction batch dropped earlier records')
-                    graph = updated_graph
-                    if graph['domain_profile'] != profile or graph['scope']['in_scope'] is not True:
-                        raise Error(422, 'profile_mismatch', 'Extraction changed accepted profile/scope')
+                         {'domain_profile': profile, 'total_pages': doc['page_count'], 'existing_graph': graph, 'classification': decision,
+                          'existing_graph_issues': structural(normalize_results(copy.deepcopy(graph)), doc['page_count'])})
+                    updated_graph = machine_graph(output)
+                    # Stable ids allow refinement; omitted records and evidence remain available.
+                    graph = merge_extraction_graph(graph, updated_graph)
             graph = machine_evidence(normalize_results(graph))
             errors = structural(graph, doc['page_count'])
             if errors:
@@ -382,6 +456,8 @@ class Runner:
             latest_doc = u.repo.get('documents', doc_id)
             if latest_item['lease_token'] != token or latest_job['status'] == 'cancel_requested':
                 raise Cancelled()
+            if latest_job['status'] in ('pause_requested', 'paused'):
+                raise Paused()
             if latest_doc['classification_id'] != cls['id']:
                 raise Error(409, 'classification_changed', 'Classification changed during extraction; retry required')
             for profile, graph in candidates.items():
@@ -412,13 +488,19 @@ class Runner:
     def finish(self, id, token, status, progress=None, error=None):
         with self.uow() as u:
             original = u.repo.get('job_items', id)
+            if not original:
+                return
             job = u.repo.get('jobs', original['job_id'], lock=True)
             item = u.repo.get('job_items', id, lock=True)
             if item['lease_token'] != token:
                 return
             if job['status'] == 'cancel_requested' and status != 'failed':
                 status = 'cancelled'
-            u.repo.update('job_items', id, status=status, progress=progress if progress is not None else item['progress'],
+            progress = progress if progress is not None else item['progress']
+            if job['status'] in ('pause_requested', 'paused') and status in ('queued', 'waiting_review', 'paused'):
+                progress = {**progress, '_resume_status': 'waiting_review' if status == 'waiting_review' else 'queued'}
+                status = 'paused'
+            u.repo.update('job_items', id, status=status, progress=progress,
                           error=error, lease_until=None, lease_token=None)
             aggregate(u.repo, item['job_id'])
             u.commit()
@@ -431,7 +513,7 @@ class Runner:
                 return
             job = u.repo.get('jobs', item['job_id'], lock=True)
             item = u.repo.get('job_items', item_id, lock=True)
-            if not item or item['status'] in TERMINAL or item['status'] == 'waiting_review':
+            if not item or item['status'] in TERMINAL or item['status'] in ('waiting_review', 'paused'):
                 return
             if item['status'] == 'running' and item['lease_until'] and item['lease_until'].replace(tzinfo=timezone.utc) > now():
                 return
@@ -440,7 +522,14 @@ class Runner:
                 aggregate(u.repo, job['id'])
                 u.commit()
                 return
-            item = u.repo.update('job_items', item_id, status='running', attempts=item['attempts']+1,
+            if job['status'] in ('pause_requested', 'paused'):
+                u.repo.update('job_items', item_id, status='paused', progress={**item['progress'], '_resume_status': 'queued'})
+                aggregate(u.repo, job['id'])
+                u.commit()
+                return
+            progress = copy.deepcopy(item['progress'])
+            resuming = progress.pop('_resuming', False)
+            item = u.repo.update('job_items', item_id, status='running', attempts=item['attempts']+(0 if resuming else 1), progress=progress,
                                  lease_token=token, lease_until=now()+timedelta(seconds=self.config.lease_seconds))
             aggregate(u.repo, job['id'])
             u.commit()
@@ -465,6 +554,8 @@ class Runner:
                                        rule=finding['rule'], severity=finding['severity'], details=finding)
                     u.commit()
                 self.finish(item_id, token, 'succeeded')
+        except Paused:
+            self.finish(item_id, token, 'paused')
         except Cancelled:
             self.finish(item_id, token, 'cancelled')
         except ExternalConfiguration as exc:

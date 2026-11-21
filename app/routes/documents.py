@@ -7,6 +7,20 @@ from app.domain import Error
 router = APIRouter(prefix='/api/v1', tags=['Corpora and PDF sources'])
 
 
+@router.delete('/corpora/{id}', status_code=204)
+def delete_corpus(id: str, identity=Depends(actor), rt=Depends(runtime)):
+    from app.services.deletion import Deletions
+    Deletions(rt.uow).remove(identity, corpus_id=id)
+    return Response(status_code=204)
+
+
+@router.delete('/documents/{id}', status_code=204)
+def delete_document(id: str, identity=Depends(actor), rt=Depends(runtime)):
+    from app.services.deletion import Deletions
+    Deletions(rt.uow).remove(identity, document_id=id)
+    return Response(status_code=204)
+
+
 @router.get('/corpora')
 def corpora(identity=Depends(actor), pagination=Depends(paging), rt=Depends(runtime)):
     return paginate(rt.documents.corpora(identity), **pagination)

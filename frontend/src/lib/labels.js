@@ -1,11 +1,12 @@
 const status = (text, tone = 'idle') => ({ text, tone })
 export const JOB_STATUS = {
+  paused: status('Приостановлено', 'wait'), pause_requested: status('Приостанавливается', 'wait'),
   queued: status('В очереди'), running: status('В работе', 'run'), waiting_review: status('Нужна проверка', 'wait'),
   succeeded: status('Готово', 'ok'), partially_succeeded: status('Частично готово', 'warn'), failed: status('Ошибка', 'error'),
   cancelled: status('Отменено', 'off'), cancel_requested: status('Останавливается', 'wait'), blocked_external_configuration: status('Не было доступа к модели', 'error')
 }
 export const TERMINAL = new Set(['succeeded', 'partially_succeeded', 'failed', 'cancelled', 'blocked_external_configuration'])
-export const DOC_STATUS = { uploaded: status('Загружен'), ready: status('Готово', 'ok'), processing: status('Обработка', 'run'), queued: status('В очереди'), needs_review: status('Нужна проверка', 'wait'), outside: status('Вне тем', 'off'), excluded: status('Вне профиля', 'off'), unreadable: status('Не читается', 'error'), failed: JOB_STATUS.failed, blocked: status('Нужен повтор', 'warn') }
+export const DOC_STATUS = { paused: JOB_STATUS.paused, uploaded: status('Загружен'), ready: status('Готово', 'ok'), processing: status('Обработка', 'run'), queued: status('В очереди'), needs_review: status('Нужна проверка', 'wait'), outside: status('Вне тем', 'off'), excluded: status('Вне профиля', 'off'), unreadable: status('Не читается', 'error'), failed: JOB_STATUS.failed, blocked: status('Нужен повтор', 'warn') }
 export const JOB_KIND = { process: 'Обработка', classify: 'Определение темы', validate: 'Проверка', export: 'Выгрузка' }
 export const STAGE = { inspect: 'Проверка файла', text: 'Текст', render: 'Страницы', ocr: 'Распознавание', classify: 'Определение темы', extract: 'Извлечение', validate: 'Проверка', export: 'Выгрузка', done: 'Завершено', links: 'Связи', sources: 'Источники' }
 export const ROLE = { viewer: 'Наблюдатель', editor: 'Редактор', admin: 'Администратор' }
