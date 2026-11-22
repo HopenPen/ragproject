@@ -44,8 +44,8 @@ class Evidence(Strict):
     def visual_source(self):
         if self.method == 'vision' and (not self.artifact_ref or not self.reading_method):
             raise ValueError('Vision evidence requires artifact_ref and reading_method')
-        if self.method == 'vision' and not (self.figure or self.bbox):
-            raise ValueError('Vision evidence requires a figure identifier or PDF bbox')
+        if self.method == 'vision' and not (self.figure or self.table or self.bbox):
+            raise ValueError('Vision evidence requires a table/figure identifier or PDF bbox')
         if self.bbox and (min(self.bbox) < 0 or self.bbox[2] <= self.bbox[0] or self.bbox[3] <= self.bbox[1]):
             raise ValueError('Invalid top-left PDF bbox')
         return self
@@ -134,6 +134,7 @@ class ResultBase(Strict):
 
 
 class SolarResult(ResultBase):
+    metric_name: str = Field(description='Use canonical PCE, Voc, Jsc, FF, Rs, Rsh, HI, Jsc_EQE, stabilized_PCE, T80, retained_PCE for these quantities. Other metrics may retain their explicit source names.')
     device_id: str | None = None
     measurement_id: str | None = None
     material_id: str | None = None

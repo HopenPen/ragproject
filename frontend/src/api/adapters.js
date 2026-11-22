@@ -63,7 +63,7 @@ export function normalizeProfile(passport) {
       const s = resolve(choices.find(x => x.type !== 'null')) || {}
       const multiple = s.type === 'array'
       const inner = multiple ? resolve(s.items) : s
-      const vocab = inner?.enum
+      const vocab = inner?.enum || (inner?.const !== undefined ? [inner.const] : undefined)
       const ref = Object.keys(ID_FIELD).find(t => ID_FIELD[t] === name && t !== type && !t.endsWith('_result'))
       const kind = s.type === 'boolean' ? 'boolean' : s.type === 'integer' ? 'integer' : choices.some(x => x.type === 'number') ? 'number' : name.endsWith('fragment') || name === 'note' ? 'text' : 'string'
       return { name, type: vocab ? 'enum' : ref ? 'ref' : kind, valueType: kind, multiple, vocab, ref, required: (model.required || []).includes(name), nullable: choices.some(x => x.type === 'null'), schema: original }
@@ -88,3 +88,20 @@ export function normalizeResult(r, ctx) {
   return { ...r, document_id: doc?.id, publication_code: doc?.publication_code, title: doc?.display_name, profile: r.domain_profile, origin: r.result_origin, issues_open: r.has_issues ? 1 : 0, context: r, source: { page: r.source_page, table: r.source_table, figure: r.source_figure } }
 }
 export const comparisonConditions = values => values.map((value, i) => ({ field: `condition_${i}`, value: Array.isArray(value) ? value.join(', ') : value === null ? 'не указано' : String(value) }))
+
+export function normalizePassport(raw) {
+  const types = { materials: 'material', devices: 'device', layers: 'layer', measurements: 'measurement', configurations: 'configuration', datasets: 'dataset', tasks: 'task', experiments: 'experiment' }
+  const units = { bandgap_value: 'bandgap_unit', active_area: 'area_unit', layer_thickness: 'thickness_unit', light_intensity: 'intensity_unit', scan_rate: 'scan_rate_unit', time_point: 'time_unit', metric_value: 'metric_unit', normalized_value: 'normalized_unit', raw_value: 'raw_unit', spread_value: 'metric_unit', baseline_value: 'metric_unit' }
+  return { profiles: Object.entries(raw).map(([profile, p]) => {
+    const schema = normalizeProfile(p)
+    return { profile, tables: Object.entries(p.csv).map(([name, columns]) => {
+      const entity = schema.entities.find(e => e.type === (name === 'results' ? (profile === 'solar-v1' ? 'solar_result' : 'rag_result') : types[name]))
+      return { file: `${name}.csv`, id_field: entity?.id_field || (name === 'issues' ? 'issue_id' : 'publication_id'), fields: columns.map(col => {
+        const f = entity?.fields.find(x => x.name === col)
+        const unitField = entity?.fields.find(x => x.name === units[col])
+        return { name: col, type: f?.valueType || 'string', required: f?.required, vocabulary: f?.vocab, references: f?.ref,
+          unit: unitField ? (unitField.vocab?.length === 1 ? unitField.vocab[0] : `по полю «${fieldLabel(unitField.name)}»`) : null }
+      }) }
+    }) }
+  }) }
+}

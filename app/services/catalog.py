@@ -351,7 +351,7 @@ class Catalog:
                         continue
                     rev = u.repo.get('publication_revisions', rid)
                     graph = rev['graph']
-                    flagged = {record_id for i in u.repo.find('issues', revision_id=rid) for record_id in i['details'].get('record_ids',[])}
+                    flagged = {record_id for i in u.repo.find('issues', revision_id=rid) if i['review'] != 'dismissed' for record_id in i['details'].get('record_ids',[])}
                     for record in graph['results']:
                         context = {}
                         if p == 'solar-v1':
@@ -434,6 +434,11 @@ class Catalog:
             if review not in ('confirmed', 'dismissed', 'open'):
                 raise Error(422, 'invalid_review', 'Invalid issue review')
             result = u.repo.update('issues', id, review=review, details={**obj['details'], 'review_revision': uid()})
+            from app.services.validation import finding_key
+            # Repeated validation jobs can report the same finding on one revision.
+            for peer in u.repo.find('issues', revision_id=obj['revision_id']):
+                if peer['id'] != id and finding_key(peer['details']) == finding_key(obj['details']):
+                    u.repo.update('issues', peer['id'], review=review, details={**peer['details'], 'review_revision': uid()})
             audit(u.repo, pub, actor, 'issue_review', reason, {'issue_id': id, 'review': review})
             touch(u.repo, pub['corpus_id'])
             u.commit()

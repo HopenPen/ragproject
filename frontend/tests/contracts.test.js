@@ -1,11 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeGraph, normalizeClassification, normalizeIssue, normalizeDocument, decodeRecord } from '../src/api/adapters.js'
+import { normalizeGraph, normalizeClassification, normalizeIssue, normalizeDocument, normalizePassport, decodeRecord } from '../src/api/adapters.js'
 import { metricParts, fmtResult } from '../src/lib/format.js'
 import { http, setTokens, clearTokens } from '../src/api/http.js'
 import { publications, catalog, jobs, corpora, documents } from '../src/api/index.js'
 
 globalThis.window = { location: { origin: 'http://localhost' } }
+
+test('passport shows fixed units and links variable units to their source field', () => {
+  const schema = { properties: { materials: { items: { $ref: '#/$defs/Material' } } }, $defs: { Material: { properties: {
+    material_id: { type: 'string' }, bandgap_value: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    bandgap_unit: { anyOf: [{ type: 'string', const: 'eV' }, { type: 'null' }] }
+  } } } }
+  // Other entity collections are deliberately empty schemas for this contract fixture.
+  for (const name of ['devices', 'layers', 'measurements', 'results']) schema.properties[name] = { items: { properties: {} } }
+  const passport = normalizePassport({ 'solar-v1': { domain_profile: 'solar-v1', fields: schema, csv: { materials: ['bandgap_value', 'bandgap_unit'] } } })
+  const fields = passport.profiles[0].tables[0].fields
+  assert.equal(fields[0].unit, 'eV')
+  assert.deepEqual(fields[1].vocabulary, ['eV'])
+})
 
 test('an old model access failure does not hide the accepted scientific graph', () => {
   const doc = { id: 'D1' }

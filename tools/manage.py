@@ -163,6 +163,9 @@ def semantic_rows(directory, profile):
         return tuple((k,v) for k,v in entity.items() if not k.endswith('_id') and k not in ('publication_id','note'))
     result = []
     for r in load_csv(directory, 'results'):
+        from app.domain import UNITS, canonical_solar_metric
+        if r.get('extraction_status') == 'absent' or (profile == 'solar-v1' and canonical_solar_metric(r['metric_name']) not in UNITS):
+            continue
         if profile == 'solar-v1':
             relations = (linked(r,'devices','device_id'), linked(r,'measurements','measurement_id'), linked(r,'materials','material_id'))
             semantic_fields = ('aggregation', 'time_point', 'time_unit')

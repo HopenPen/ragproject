@@ -40,6 +40,7 @@ class ResponsesModel:
         self.config = config
 
     def call(self, purpose, schema, pages, context):
+        started = time.perf_counter()
         key = self.config.openai_api_key.get_secret_value()
         if not key:
             raise ExternalConfiguration('OPENAI_API_KEY is not configured')
@@ -56,9 +57,20 @@ class ResponsesModel:
             'RAG: external retrieval used in generation, configuration plus evaluation needed for in_scope. top_k is not metric_k. '
             'A baseline reproduced by the article authors is primary; a number quoted from another paper is cited. '
             'Cited solar results must have null device_id and measurement_id. Never mark evidence as manually reviewed or confirmed. '
-            'Use stable entity ids consistent with existing_graph. Return the full updated graph for extraction, preserving prior page facts. '
+            'Use stable entity ids consistent with existing_graph. For output_mode=delta return only new or explicitly refined entities and evidence; the server preserves omitted prior entities. '
+            'Extract EVERY explicit numeric table cell for every reported configuration/dataset/metric and every ablation, including appendix tables. Do not summarize a table as a few representative rows or a series in one result. '
+            'If repair=true return the FULL corrected graph. Preserve valid scientific facts. Fix links only with source support; do not invent entities, citation references, conditions or values to satisfy validation. '
+            'Exception: for output_mode=repair_delta use the repair envelope: graph contains only changed/new entities and evidence; omitted records remain unchanged. Explicitly list removed_entities/removed_evidence with source-backed reasons when removing invalid records. Never return an upsert for an id also marked removed. '
+            'Remove a result only if the supplied PDF shows it is not a scientific result of the target domain or has no supporting source. '
             'Resolve existing_graph_issues using the provided source facts. Every evidence.entity_id must refer to an entity actually included in the graph. '
+            'For solar use the canonical metric names PCE, Voc, Jsc, FF, Rs, Rsh, HI, Jsc_EQE, stabilized_PCE, T80, retained_PCE. RAG metric names remain open. '
+            'For primary RAG results include configuration, dataset, task and experiment entities and their links. Do not extract background population statistics as RAG evaluation results. '
+            'Do not set duplicate_of for different measurement conditions; a repeated numeric value alone does not imply a duplicate. '
+            'Page numbers always mean the supplied 1-based PDF number, not printed journal pagination. bbox is in PDF points using width_pdf_points/height_pdf_points, never image pixels. '
+            'Use an artifact_ref copied exactly from an image artifact on the declared source page. Use a table identifier for visual tables and a figure identifier for plots. '
+            'A page preceding target_pages is context for continued sentences, table headers and units; do not repeat its already extracted results. '
             'For classification return page-batch observations; do not infer outside merely from scope=false. '
+            'A solar simulation paper still has label solar with solar.in_scope=false and outcome resolved/needs_review, never outside. '
             'For excluded graphs leave all subject collections empty. Evidence entity ids and links stay within this profile/publication.')
         content = [{'type': 'input_text', 'text': json.dumps({'purpose': purpose, **context}, ensure_ascii=False)}]
         for p in pages:
@@ -87,11 +99,14 @@ class ResponsesModel:
             if response.status_code != 200:
                 raise Error(502, 'provider_rejected', f'Provider rejected schema/request (HTTP {response.status_code})')
             result = response.json()
+            metadata = {'model': result.get('model', self.config.model_id), 'usage': result.get('usage', {}),
+                        'response_id': result.get('id'), 'elapsed_ms': round((time.perf_counter()-started)*1000)}
             if result.get('status') != 'completed':
-                raise Error(502, 'partial_model_output', 'Provider output incomplete; coverage is partial')
+                raise Error(502, 'partial_model_output', 'Provider output incomplete; coverage is partial',
+                            {**metadata, 'reason': (result.get('incomplete_details') or {}).get('reason')})
             texts = [c['text'] for out in result.get('output', []) for c in out.get('content', []) if c.get('type') == 'output_text']
             try:
                 output = json.loads(''.join(texts))
             except (ValueError, TypeError):
-                raise Error(502, 'invalid_model_output', 'Provider did not return complete JSON')
-            return {'output': output, 'model': result.get('model', self.config.model_id), 'usage': result.get('usage', {}), 'response_id': result.get('id')}
+                raise Error(502, 'invalid_model_output', 'Provider did not return complete JSON', metadata)
+            return {'output': output, **metadata}

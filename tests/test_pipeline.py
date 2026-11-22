@@ -152,6 +152,37 @@ def test_strict_export_rejects_missing_classification(env,corpus):
     assert job['input']['snapshot']['omissions']
 
 
+def test_issue_review_is_frozen_in_export_and_does_not_change_scientific_values(env, corpus):
+    runner = Runner(Uow, env.storage, ModelDouble(), env.config)
+    _, items = enqueue(env, corpus)
+    runner.run(items[0]['id'])
+    with Uow() as u:
+        issue = u.repo.find('issues', publication_id=corpus.pub['id'], profile='solar-v1')[0]
+        graph = u.repo.get('publication_revisions', issue['revision_id'])['graph']
+        duplicate = u.repo.add('issues', **{k: issue[k] for k in ('corpus_id', 'publication_id', 'revision_id', 'run_id', 'profile', 'rule', 'severity', 'details')})
+        u.commit()
+    old, old_items = enqueue(env, corpus, 'export', run_external_checker=False)
+    changed = env.rt.catalog.review_issue(env.actors['editor'], issue['id'], 'dismissed', '', issue['id'])
+    new, new_items = enqueue(env, corpus, 'export', run_external_checker=False)
+    for item in [old_items[0], new_items[0]]:
+        runner.run(item['id'])
+    with Uow() as u:
+        assert u.repo.get('issues', duplicate['id'])['review'] == 'dismissed'
+        assert u.repo.get('publication_revisions', issue['revision_id'])['graph'] == graph
+        exports = [u.repo.get('jobs', job['id']) for job in (old, new)]
+    for job, expected in zip(exports, [True, False]):
+        with zipfile.ZipFile(io.BytesIO(env.storage.get(job['result']['storage_key']))) as archive:
+            csv_text = archive.read('solar-v1/submission/issues.csv').decode()
+            csv_rows = list(__import__('csv').DictReader(io.StringIO(csv_text)))
+            assert any(row['check_name'] == issue['rule'] for row in csv_rows) is expected
+        findings = next(r['validation']['issues'] for r in job['result']['report']['publications'] if r['profile'] == 'solar-v1')
+        f = next(f for f in findings if f['rule'] == issue['rule'])
+        assert f['review'] == ('open' if expected else 'dismissed')
+    reopened = env.rt.catalog.review_issue(env.actors['editor'], issue['id'], 'open', '', changed['details']['review_revision'])
+    with Uow() as u:
+        assert u.repo.get('issues', duplicate['id'])['review'] == reopened['review'] == 'open'
+
+
 def test_request_forbids_model_override_and_inapplicable_fields():
     for payload in ({'kind':'process','all_documents':True,'model_id':'custom'},
                     {'kind':'classify','all_documents':True,'target_profiles':['solar-v1']}):

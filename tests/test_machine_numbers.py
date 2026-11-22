@@ -77,7 +77,8 @@ def test_later_page_batch_preserves_previous_records_and_evidence(env):
             result = super().call(purpose, schema, pages, context)
             if purpose == 'extract' and context['domain_profile'] == 'solar-v1':
                 graph = solar_graph()
-                if pages[0]['number'] == 4:
+                if context['target_pages'] == [4]:
+                    assert [page['number'] for page in pages] == [3, 4]
                     new = copy.deepcopy(graph['results'][-1])
                     new.update(result_id='R5', source_page=4)
                     graph.update(materials=[], devices=[], layers=[], measurements=[], results=[new])

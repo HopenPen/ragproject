@@ -1,6 +1,6 @@
 // Boundary adapters keep the uploaded Vue views independent of server DTOs.
 import { http, upload, download, newIdempotencyKey, tokens } from './http.js'
-import { normalizeCorpus, normalizeGraph, normalizeClassification, normalizeDocument, normalizeJob, normalizeIssue, normalizeProfile, normalizeResult, decodeRecord, comparisonConditions } from './adapters.js'
+import { normalizeCorpus, normalizeGraph, normalizeClassification, normalizeDocument, normalizeJob, normalizeIssue, normalizeProfile, normalizeResult, normalizePassport, decodeRecord, comparisonConditions } from './adapters.js'
 
 const enc = encodeURIComponent
 const contexts = new Map()
@@ -99,7 +99,7 @@ export const jobs = {
   report: async id => (await http.get(`/jobs/${enc(id)}/report`)).data,
   passport: async id => {
     const raw = (await http.get(`/jobs/${enc(id)}/passport`)).data
-    return { profiles: Object.entries(raw).map(([profile, p]) => { const schema = normalizeProfile(p); return { profile, tables: Object.entries(p.csv).map(([name, columns]) => { const entity = schema.entities.find(e => e.type === ({ materials: 'material', devices: 'device', layers: 'layer', measurements: 'measurement', results: profile === 'solar-v1' ? 'solar_result' : 'rag_result', configurations: 'configuration', datasets: 'dataset', tasks: 'task', experiments: 'experiment' })[name]); return { file: `${name}.csv`, id_field: entity?.id_field || (name === 'issues' ? 'issue_id' : 'publication_id'), fields: columns.map(col => { const f = entity?.fields.find(x => x.name === col); return { name: col, type: f?.valueType || 'string', required: f?.required, vocabulary: f?.vocab, references: f?.ref } }) } }) } }) }
+    return normalizePassport(raw)
   },
   download: (id, name) => download(`/jobs/${enc(id)}/download`, name || `science-extract-${id}.zip`)
 }

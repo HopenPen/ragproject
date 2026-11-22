@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 from app.domain import PROFILES, PIPELINE_VERSION, RULES_VERSION, now
 from app.profiles import csv_columns, passport
-from app.services.validation import validate
+from app.services.validation import validate, apply_issue_reviews
 
 
 def cell(value):
@@ -50,7 +50,7 @@ def export_rows(snapshot, profile, validations):
             report = validations.get(rev['id'], {})
             rows['issues'] += [{'publication_id': code, 'issue_id': f'I{i+1}', 'record_ids': f.get('record_ids'),
                                'check_name': f['rule'], 'description': f['description'],
-                               'source_page': f.get('source_page'), 'source_fragment': f.get('source_fragment')} for i, f in enumerate(report.get('issues', []))]
+                               'source_page': f.get('source_page'), 'source_fragment': f.get('source_fragment')} for i, f in enumerate(report.get('issues', [])) if f.get('review') != 'dismissed']
     return rows
 
 
@@ -66,6 +66,7 @@ class Exporter:
             for profile, rev in entry['graphs'].items():
                 result = validate(rev['graph'], entry['document']['page_count'],
                                   entry['pages'] if job['input'].get('check_sources', True) else None, entry['artifacts'])
+                result['issues'] = apply_issue_reviews(result['issues'], [i for i in entry.get('issues', []) if i['revision_id'] == rev['id']])
                 validations[rev['id']] = result
                 reports.append({'publication_id': entry['publication_id'], 'revision_id': rev['id'], 'profile': profile, 'validation': result})
         report = {'snapshot_created_at': snapshot['created_at'], 'publications': reports, 'omissions': snapshot['omissions'],

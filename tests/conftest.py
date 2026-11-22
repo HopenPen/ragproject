@@ -49,6 +49,8 @@ class ModelDouble:
             output=copy.deepcopy(self.decision)
         else:
             output=solar_graph() if context['domain_profile']=='solar-v1' else rag_graph()
+            if context.get('output_mode') == 'repair_delta':
+                output = {'graph': output, 'removed_entities': [], 'removed_evidence': []}
         return {'output':output,'model':'TEST-DOUBLE-NOT-REAL','usage':{'input_tokens':1,'output_tokens':1},'response_id':'test'}
 
 

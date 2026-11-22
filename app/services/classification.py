@@ -1,4 +1,19 @@
 import copy
+from pydantic import ValidationError
+from app.domain import Error
+from app.schemas.graphs import Classification
+
+
+def machine_classification(value):
+    """Topic and experimental scope are independent. Manual inputs stay strict."""
+    value = copy.deepcopy(value)
+    if value.get('outcome') == 'outside' and value.get('labels'):
+        value['outcome'] = 'needs_review'
+    try:
+        return Classification.model_validate(value).model_dump(mode='json')
+    except ValidationError as exc:
+        raise Error(422, 'invalid_classification', 'Invalid model classification',
+                    exc.errors(include_context=False, include_input=False)) from exc
 
 
 def automatic_decision(value, threshold):

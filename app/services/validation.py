@@ -3,13 +3,47 @@ import re
 from collections import defaultdict
 from decimal import Decimal
 from pydantic import ValidationError
-from app.domain import Error, UNITS, RULES_VERSION, decimal_value, normalize_value, quote_normalize, uid
+from app.domain import Error, UNITS, RULES_VERSION, decimal_value, normalize_value, quote_normalize, uid, digest, scalar_number
 from app.profiles import GRAPHS, ENTITIES, rules
 
 
 def issue(rule, description, records=None, severity='warning', **details):
     return {'issue_id': uid(), 'rule': rule, 'version': RULES_VERSION, 'severity': severity,
             'record_ids': records or [], 'description': description, **details}
+
+
+def finding_key(finding):
+    # Rule version, numerical values and affected entities are part of the identity.
+    return digest({k: v for k, v in finding.items() if k not in ('issue_id', 'review_revision', 'review')})
+
+
+def apply_issue_reviews(findings, saved):
+    reviews = {}
+    for item in saved:
+        key = finding_key(item['details'])
+        if key not in reviews or item['review'] != 'open':
+            reviews[key] = item['review']
+    return [{**f, 'review': reviews.get(finding_key(f), 'open')} for f in findings]
+
+
+def caption_index(pages):
+    index = defaultdict(set)
+    for page in pages:
+        for match in re.finditer(r'(?im)^\s*(fig(?:ure)?|table)\.?\s*(S?\d+[a-z]?)\s*[.:|\-–—]', page.get('text') or ''):
+            kind = 'figure' if match[1].casefold().startswith('fig') else 'table'
+            index[(kind, match[2].casefold())].add(page['number'])
+    return index
+
+
+def caption_page(index, figure=None, table=None):
+    kind, label = ('figure', figure) if figure else ('table', table)
+    if not label:
+        return None
+    match = re.search(r'(?:fig(?:ure)?|table)\.?\s*(S?\d+[a-z]?)(?=[\s.:|(]|$)', label, re.I)
+    if not match:
+        return None
+    numbers = index.get((kind, match[1].casefold()), set())
+    return next(iter(numbers)) if len(numbers) == 1 else None
 
 
 def typed_graph(value):
@@ -46,6 +80,12 @@ def machine_graph(value):
             continue
         row = graph[collection][index]
         original = error['input']
+        grouped = scalar_number(original) if isinstance(original, str) and ',' in original else None
+        if grouped is not None and (not error['type'].startswith('int_') or grouped == grouped.to_integral_value()):
+            row[field] = int(grouped) if error['type'].startswith('int_') else str(grouped)
+            row['note'] = ((row.get('note') + '\n') if row.get('note') else '') + f'Исходная запись {field}: {original}; английский разделитель тысяч. Исходное значение сохранено.'
+            repaired = True
+            continue
         row[field] = None
         note = f'Исходное значение {field}: {original}. Требует проверки по источнику.'
         if note not in (row.get('note') or ''):
@@ -111,14 +151,14 @@ def structural(graph, page_count=None):
                     break
                 cursor = cursor[part]
         if page_count and ev['source_page'] > page_count:
-            errors.append(issue('source_page', 'Evidence page out of range', severity='error'))
+            errors.append(issue('source_page', 'Evidence page out of range', [ev.get('entity_id')], severity='error', evidence_id=ev['evidence_id'], source_page=ev['source_page']))
     measurement_map = collections.get('measurements', {})
-    layer_orders = set()
+    layer_orders = {}
     for layer in graph.get('layers', []):
         order = (layer['device_id'], layer['layer_order'])
         if order in layer_orders:
-            errors.append(issue('links', 'Duplicate layer order within device', severity='error'))
-        layer_orders.add(order)
+            errors.append(issue('links', 'Duplicate layer order within device', [layer_orders[order], layer['layer_id']], severity='error'))
+        layer_orders[order] = layer['layer_id']
     result_map = collections['results']
     for result in graph['results']:
         rid = result['result_id']
@@ -177,17 +217,21 @@ def source_checks(graph, pages, artifacts=None):
     findings = []
     page_map = {p['number']: p for p in pages}
     artifact_map = {a['id']: a for a in artifacts or []}
+    captions = caption_index(pages)
     for ev in graph['evidence']:
         p = page_map.get(ev['source_page'])
+        caption = caption_page(captions, ev.get('figure'), ev.get('table')) if ev['method'] == 'vision' else None
+        if caption is not None and caption != ev['source_page']:
+            findings.append(issue('source', 'Visual source page disagrees with the unique caption', [ev.get('entity_id')], 'error', source_page=ev['source_page'], caption_page=caption))
         if ev.get('artifact_ref') and artifacts is not None and ev['artifact_ref'] not in artifact_map:
-            findings.append(issue('source', 'Artifact reference is missing or belongs to another document', [ev.get('entity_id')], 'error'))
+            findings.append(issue('source', 'Artifact reference is missing or belongs to another document', [ev.get('entity_id')], 'error', source_page=ev['source_page']))
         artifact = artifact_map.get(ev.get('artifact_ref'))
         if artifact and artifact['page'] != ev['source_page']:
-            findings.append(issue('source', 'Artifact and evidence page disagree', [ev.get('entity_id')], 'error'))
+            findings.append(issue('source', 'Artifact and evidence page disagree', [ev.get('entity_id')], 'error', source_page=ev['source_page']))
         if artifact and ev['method']=='vision' and not artifact['content_type'].startswith('image/'):
-            findings.append(issue('source', 'Visual evidence requires an image artifact', [ev.get('entity_id')], 'error'))
+            findings.append(issue('source', 'Visual evidence requires an image artifact', [ev.get('entity_id')], 'error', source_page=ev['source_page']))
         if ev['bbox'] and p and (Decimal(ev['bbox'][2]) > Decimal(str(p['width'])) or Decimal(ev['bbox'][3]) > Decimal(str(p['height']))):
-            findings.append(issue('source', 'BBox exceeds PDF page dimensions', [ev.get('entity_id')], 'error'))
+            findings.append(issue('source', 'BBox exceeds PDF page dimensions', [ev.get('entity_id')], 'error', source_page=ev['source_page']))
         fragment = ev.get('fragment')
         if ev['review'] == 'rejected':
             findings.append(issue('source', 'Rejected evidence needs replacement', [ev.get('entity_id')], 'needs_review', source_page=ev['source_page']))

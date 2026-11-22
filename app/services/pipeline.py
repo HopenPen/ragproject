@@ -3,8 +3,10 @@ import hashlib
 import json
 from datetime import timedelta, timezone
 from app.domain import (Error, ExternalConfiguration, TransientError, TERMINAL, PROFILES, now, uid, digest,
-                        corpus_access, precondition, PIPELINE_VERSION, PROMPT_VERSION, RULES_VERSION, UNITS, normalize_value)
-from app.services.classification import automatic_decision
+                        corpus_access, precondition, PIPELINE_VERSION, PROMPT_VERSION, RULES_VERSION, UNITS, normalize_value,
+                        canonical_solar_metric, canonical_unit)
+from app.services.classification import automatic_decision, machine_classification
+from app.services.model_candidates import machine_sources, repair_duplicate_links, REPAIR_SCHEMAS, apply_graph_repair
 from app.profiles import GRAPHS
 from app.schemas.graphs import Classification
 from app.services.catalog import document, publication, save_revision, touch
@@ -65,7 +67,8 @@ def snapshot(repo, docs, profiles, strict):
             if expected is True and (not rev or rev['graph']['scope']['in_scope'] is not True):
                 omissions.append({'document_id': doc['id'], 'profile': p, 'reason': 'missing_active_in_scope_graph'})
         entries.append({'document': doc, 'publication_id': pub['id'], 'classification': cls, 'graphs': graphs,
-                        'pages': repo.find('pages', document_id=doc['id']), 'artifacts': repo.find('artifacts', document_id=doc['id'])})
+                        'pages': repo.find('pages', document_id=doc['id']), 'artifacts': repo.find('artifacts', document_id=doc['id']),
+                        'issues': [i for i in repo.find('issues', publication_id=pub['id']) if i['revision_id'] in {r['id'] for r in graphs.values()}]})
     if strict and omissions:
         raise Error(409, 'incomplete_snapshot', 'Strict export requires accepted classifications and valid active graphs', omissions)
     # JSON round-trip detaches mutable ORM/DTO values and fixes UTC values at enqueue.
@@ -258,7 +261,9 @@ class Paused(Exception):
 
 def normalize_results(graph):
     for result in graph['results']:
-        target = (UNITS.get(result['metric_name']) if graph['domain_profile']=='solar-v1' else None) or result['normalized_unit'] or result['raw_unit']
+        if graph['domain_profile'] == 'solar-v1':
+            result['metric_name'] = canonical_solar_metric(result['metric_name'])
+        target = canonical_unit((UNITS.get(result['metric_name']) if graph['domain_profile']=='solar-v1' else None) or result['normalized_unit'] or result['raw_unit'])
         value = normalize_value(result['raw_value'], result['raw_unit'], target)
         result.update(normalized_value=str(value) if value is not None else None, normalized_unit=target if value is not None else None,
                       metric_value=str(value) if value is not None else None, metric_unit=target if value is not None else None)
@@ -267,8 +272,13 @@ def normalize_results(graph):
 
 def merge_extraction_graph(previous, updated):
     from app.profiles import ENTITIES
-    if updated['domain_profile'] != previous['domain_profile'] or updated['scope']['in_scope'] is not True:
+    if updated['domain_profile'] != previous['domain_profile'] or updated['scope']['in_scope'] is False:
         raise Error(422, 'profile_mismatch', 'Extraction changed accepted profile/scope')
+    if updated['scope']['in_scope'] is None:
+        updated['scope'] = copy.deepcopy(previous['scope'])
+    for field, old_value in previous['bibliography'].items():
+        if updated['bibliography'].get(field) is None or (field == 'authors' and not updated['bibliography'].get(field)):
+            updated['bibliography'][field] = copy.deepcopy(old_value)
     collections = [(collection, key) for profile, collection, key, _ in ENTITIES.values()
                    if profile == previous['domain_profile']] + [('evidence', 'evidence_id')]
     for collection, key in collections:
@@ -316,12 +326,23 @@ class Runner:
         outputs = progress.setdefault('outputs', {})
         if key in outputs:
             return outputs[key]['output']
-        if len(outputs) >= self.config.model_max_calls:
+        if progress.get('replay_only'):
+            raise Error(409, 'replay_missing_output', 'Saved response is unavailable; replay never calls the provider', {'call': key})
+        if len(outputs) + len(progress.get('failed_calls', {})) >= self.config.model_max_calls:
             raise Error(422, 'model_budget_exceeded', 'Model call budget exhausted; coverage is partial')
         self.checkpoint(item_id, token, progress, purpose)
-        result = self.model.call(purpose, schema, pages, context)
+        try:
+            result = self.model.call(purpose, schema, pages, context)
+        except Error as exc:
+            if isinstance(exc.details, dict) and 'usage' in exc.details:
+                failed = progress.setdefault('failed_calls', {})
+                failed[f'{key}:{len(failed)}'] = {**exc.details, 'error': exc.code}
+                progress['usage'] = {field: sum(out.get('usage', {}).get(field, 0) for out in [*outputs.values(), *failed.values()])
+                                     for field in ('input_tokens', 'output_tokens', 'total_tokens')}
+                self.checkpoint(item_id, token, progress, purpose, check_cancel=False)
+            raise
         outputs[key] = result
-        progress['usage'] = {field:sum(out.get('usage',{}).get(field,0) for out in outputs.values())
+        progress['usage'] = {field:sum(out.get('usage',{}).get(field,0) for out in [*outputs.values(), *progress.get('failed_calls', {}).values()])
                              for field in ('input_tokens','output_tokens','total_tokens')}
         progress.update(model=result['model'], pipeline_version=PIPELINE_VERSION, prompt_version=PROMPT_VERSION,
                         schema_version='1.0.0', rules_version=RULES_VERSION)
@@ -352,6 +373,10 @@ class Runner:
             artifacts = [('page', 'render', prepared['png'], 'image/png', {})]
             artifacts += [('crop', c['name'], c['data'], 'image/png', {'bbox': c['bbox']}) for c in prepared['crops']]
             artifacts.append(('table', 'tables', json.dumps(prepared['tables']).encode(), 'application/json', {}))
+            if prepared.get('text_replacements'):
+                artifacts.append(('text', 'original-extraction', prepared['raw_text'].encode(), 'text/plain',
+                                  {'nul_replacements': prepared['text_replacements'], 'replacement_character': 'U+FFFD'}))
+                progress.setdefault('text_sanitization', {})[str(number)] = prepared['text_replacements']
             if prepared['ocr']:
                 artifacts.append(('ocr', 'text', prepared['text'].encode(), 'text/plain', {}))
             for kind, name, blob, content_type, details in artifacts:
@@ -370,7 +395,7 @@ class Runner:
         progress['coverage'] = {'prepared': len(manifest), 'total': doc['page_count'], 'complete': len(manifest) == doc['page_count']}
         self.checkpoint(item['id'], token, progress, 'classify')
         with self.uow() as u:
-            pages = u.repo.find('pages', document_id=doc_id)
+            pages = sorted(u.repo.find('pages', document_id=doc_id), key=lambda p: p['number'])
             artifacts = u.repo.find('artifacts', document_id=doc_id)
             doc = u.repo.get('documents', doc_id)
             cls = u.repo.get('classification_revisions', doc['classification_id']) if doc['classification_id'] else None
@@ -383,10 +408,10 @@ class Runner:
                 batch = self.batch(pages[start:start+self.config.page_batch_size], artifacts)
                 obs = self.model_call(item['id'], token, progress, f'classify-{start}', 'classify', Classification.model_json_schema(), batch,
                                       {'total_pages': doc['page_count'], 'batch_only': True})
-                observations.append(Classification.model_validate(obs).model_dump(mode='json'))
+                observations.append(machine_classification(machine_sources(obs, pages, artifacts, progress.setdefault('adjustments', []))))
             decision = self.model_call(item['id'], token, progress, 'classify-final', 'classify', Classification.model_json_schema(), [],
                                       {'observations': observations, 'total_pages': doc['page_count'], 'coverage': progress['coverage'], 'aggregate_all_observations': True})
-            decision = automatic_decision(machine_evidence(Classification.model_validate(decision).model_dump(mode='json')),
+            decision = automatic_decision(machine_evidence(machine_classification(machine_sources(decision, pages, artifacts, progress.setdefault('adjustments', [])))),
                                           self.config.classification_confidence_threshold)
             with self.uow() as u:
                 u.repo.get('corpora', doc['corpus_id'], lock=True)
@@ -434,17 +459,25 @@ class Runner:
             graph = GRAPHS[profile](domain_profile=profile, bibliography=decision['bibliography'], scope=scope).model_dump(mode='json')
             if scope['in_scope'] is True:
                 for start in range(0, len(pages), self.config.page_batch_size):
-                    batch = self.batch(pages[start:start+self.config.page_batch_size], artifacts)
+                    # One previous page carries table headers/units over a batch boundary.
+                    batch = self.batch(pages[max(0,start-1):start+self.config.page_batch_size], artifacts)
                     output = self.model_call(item['id'], token, progress, f'{profile}-{start}', 'extract', GRAPHS[profile].model_json_schema(), batch,
                          {'domain_profile': profile, 'total_pages': doc['page_count'], 'existing_graph': graph, 'classification': decision,
+                          'target_pages': [p['number'] for p in pages[start:start+self.config.page_batch_size]], 'output_mode': 'delta',
                           'existing_graph_issues': structural(normalize_results(copy.deepcopy(graph)), doc['page_count'])})
-                    updated_graph = machine_graph(output)
+                    output = machine_sources(output, pages, artifacts, progress.setdefault('adjustments', []))
+                    try:
+                        updated_graph = machine_graph(output)
+                    except Error as exc:
+                        if exc.code != 'invalid_graph':
+                            raise
+                        corrected = self.model_call(item['id'], token, progress, f'{profile}-schema-repair-{start}', 'extract', GRAPHS[profile].model_json_schema(), batch,
+                            {'domain_profile': profile, 'existing_graph': graph, 'invalid_output': output,
+                             'existing_graph_issues': exc.details, 'repair': True, 'total_pages': doc['page_count']})
+                        updated_graph = machine_graph(machine_sources(corrected, pages, artifacts, progress['adjustments']))
                     # Stable ids allow refinement; omitted records and evidence remain available.
                     graph = merge_extraction_graph(graph, updated_graph)
-            graph = machine_evidence(normalize_results(graph))
-            errors = structural(graph, doc['page_count'])
-            if errors:
-                raise Error(422, 'invalid_candidate', 'Extracted graph has structural errors', errors)
+            graph = self.repair_candidate(item['id'], token, progress, profile, graph, decision, pages, artifacts)
             progress.setdefault('profile_coverage', {})[profile] = {'pages': doc['page_count'], 'complete': True}
             candidates[profile] = graph
         # Publish both profiles in one transaction after all calls and cancellation checks.
@@ -481,9 +514,49 @@ class Runner:
             u.commit()
         self.finish(item['id'], token, 'succeeded', progress)
 
+    def repair_candidate(self, item_id, token, progress, profile, graph, decision, pages, artifacts):
+        graph = repair_duplicate_links(machine_evidence(normalize_results(graph)), progress.setdefault('adjustments', []))
+        def findings():
+            return structural(graph, len(pages)) + [f for f in source_checks(graph, pages, artifacts) if f['severity'] == 'error']
+        errors = findings()
+        for attempt in range(2):
+            if not errors or graph['scope']['in_scope'] is not True:
+                break
+            numbers = {f.get('source_page') for f in errors if f.get('source_page')}
+            affected = {rid for f in errors for rid in f.get('record_ids', [])}
+            numbers.update(r['source_page'] for r in graph['results'] if r['result_id'] in affected)
+            if not numbers:
+                numbers = {p['number'] for p in pages}
+            repair_pages = [p for p in pages if any(abs(p['number']-n) <= 1 for n in numbers)][:9] or pages[:9]
+            corrected = self.model_call(item_id, token, progress, f'{profile}-repair-{attempt}', 'extract', REPAIR_SCHEMAS[profile].model_json_schema(), self.batch(repair_pages, artifacts),
+                {'domain_profile': profile, 'existing_graph': graph, 'existing_graph_issues': errors,
+                 'classification': decision, 'total_pages': len(pages), 'repair': True, 'output_mode': 'repair_delta',
+                 'document_text': [{'number': p['number'], 'text': p['text']} for p in pages]})
+            from pydantic import ValidationError
+            try:
+                corrected = copy.deepcopy(corrected)
+                if not isinstance(corrected, dict) or not isinstance(corrected.get('graph'), dict):
+                    raise Error(422, 'invalid_model_output', 'Repair envelope must contain a graph object')
+                corrected['graph'] = machine_sources(corrected['graph'], pages, artifacts, progress['adjustments'])
+                repaired_graph = apply_graph_repair(graph, corrected)
+            except (Error, ValidationError) as exc:
+                details = exc.details if isinstance(exc, Error) else exc.errors(include_context=False, include_input=False)
+                rejection = {'rule': 'repair_schema', 'description': exc.message if isinstance(exc, Error) else 'Invalid repair schema', 'details': details}
+                progress.setdefault('repair_rejections', {})[f'{profile}-{attempt}'] = rejection
+                errors = errors + [rejection]
+                continue
+            graph = repaired_graph
+            graph = repair_duplicate_links(machine_evidence(normalize_results(graph)), progress['adjustments'])
+            progress.setdefault('repairs', {})[f'{profile}-{attempt}'] = {k: corrected[k] for k in ('removed_entities', 'removed_evidence')}
+            errors = findings()
+        if errors:
+            raise Error(422, 'invalid_candidate', 'Extracted graph has structural/source errors after bounded repair', errors)
+        return graph
+
     def batch(self, pages, artifacts):
         return [{'number': p['number'], 'text': p['text'], 'png': self.storage.get(p['image_key']),
-                 'artifacts': [{'artifact_ref': a['id'], 'kind': a['kind'], 'details': a['details']} for a in artifacts if a['page'] == p['number']]} for p in pages]
+                 'width_pdf_points': p['width'], 'height_pdf_points': p['height'],
+                 'artifacts': [{'artifact_ref': a['id'], 'kind': a['kind'], 'content_type': a['content_type'], 'details': a['details']} for a in artifacts if a['page'] == p['number']]} for p in pages]
 
     def finish(self, id, token, status, progress=None, error=None):
         with self.uow() as u:
@@ -578,7 +651,15 @@ class Runner:
             code = exc.code if isinstance(exc, Error) else type(exc).__name__
             current, _ = self.load(item_id)
             progress = current['progress']
+            from pydantic import ValidationError
+            from sqlalchemy.exc import DBAPIError
+            details = exc.details if isinstance(exc, Error) else None
+            if isinstance(exc, ValidationError):
+                details = exc.errors(include_context=False, include_input=False)
+            elif isinstance(exc, DBAPIError):
+                # SQL/parameters can include private document text or credentials.
+                details = {'database_error': type(exc.orig).__name__, 'sqlstate': getattr(exc.orig, 'sqlstate', None)}
             progress['diagnostic'] = {'code':code, 'message':exc.message if isinstance(exc,Error) else type(exc).__name__,
-                                      'details':exc.details if isinstance(exc,Error) else None}
+                                      'details':details}
             self.finish(item_id, token, 'failed', progress=progress, error=code)
             raise

@@ -95,15 +95,19 @@ class Storage:
             page = pdf[number-1]
             pix = page.get_pixmap(dpi=self.config.render_dpi, alpha=False)
             png = pix.tobytes('png')
-            blocks = [{'bbox': list(b[:4]), 'text': b[4]} for b in page.get_text('blocks') if b[6] == 0]
-            text = page.get_text()
+            # PDF font maps sometimes emit NUL. PostgreSQL text/jsonb reject it.
+            # Keep the original PDF and extracted text; never join words by deleting it.
+            blocks = [{'bbox': list(b[:4]), 'text': b[4].replace('\x00', '\ufffd')} for b in page.get_text('blocks') if b[6] == 0]
+            raw_text = page.get_text()
+            text = raw_text.replace('\x00', '\ufffd')
             needs_ocr = len(text.strip()) < 40
             ocr_error = None
             ocr_text = ''
             if needs_ocr:
                 try:
                     ocr_text = pytesseract.image_to_string(Image.open(io.BytesIO(png)), lang='eng+rus', timeout=120)
-                    text = ocr_text
+                    raw_text = ocr_text
+                    text = ocr_text.replace('\x00', '\ufffd')
                 except (pytesseract.TesseractNotFoundError, RuntimeError) as exc:
                     raise ExternalConfiguration('Tesseract eng/rus is unavailable') from exc
             crops = []
@@ -120,4 +124,5 @@ class Storage:
                     tables = []
             return {'number': number, 'width': page.rect.width, 'height': page.rect.height, 'text': text,
                     'blocks': blocks, 'png': png, 'ocr': needs_ocr, 'engine': 'tesseract+PyMuPDF' if needs_ocr else 'PyMuPDF',
-                    'coverage': 'complete', 'tables': tables, 'crops': crops, 'ocr_text': ocr_text}
+                    'coverage': 'complete', 'tables': tables, 'crops': crops, 'ocr_text': ocr_text,
+                    'raw_text': raw_text, 'text_replacements': raw_text.count('\x00')}
