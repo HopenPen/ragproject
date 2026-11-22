@@ -90,7 +90,7 @@ function retryRow (r) { r.state = 'ready'; r.message = ''; r.progress = 0 }
         </div>
         <label class="uprow__code">
           <span class="visually-hidden">Код статьи</span>
-          <input v-model="r.code" class="input input--sm" :disabled="!['ready', 'failed'].includes(r.state)" placeholder="D001" :aria-invalid="r.state === 'ready' && !!r.message">
+          <input v-model="r.code" class="input input--sm" :disabled="!['ready', 'failed'].includes(r.state)" placeholder='Например: "D001"' :aria-invalid="r.state === 'ready' && !!r.message">
         </label>
         <span class="uprow__state">
           <span v-if="r.state === 'done'" class="chip chip--ok uprow__ok">Загружен</span>
@@ -125,7 +125,7 @@ function retryRow (r) { r.state = 'ready'; r.message = ''; r.progress = 0 }
 .uprow__bar { margin-top: 6px; }
 .uprow__msg { margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--pencil); }
 .uprow--failed .uprow__msg, .uprow--error .uprow__msg, .uprow--ready .uprow__msg { color: var(--danger); }
-.uprow__code { width: 92px; flex: none; }
+.uprow__code { width: 156px; flex: none; }
 .uprow__state { display: flex; justify-content: flex-end; min-width: 84px; }
 .uprow__ok { color: var(--accent-text); }
 </style>

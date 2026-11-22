@@ -39,7 +39,7 @@ const openIssues = computed(() => props.issues.filter(i => !i.stale))
 const tone = computed(() => openIssues.value.some(i => i.status === 'open' && i.severity === 'error') ? 'error' : openIssues.value.some(i => i.status === 'open') ? 'warn' : 'ok')
 
 async function review (decision) {
-  const reason = decision === 'confirmed' ? '' : await askReason({ title: 'Источник не подходит', text: 'Источник будет отмечен как отклонённый, исходная цитата сохранится в истории. Значение останется, пока его не исправят.', confirm: 'Отклонить источник', placeholder: 'Например: число взято из строки другого прибора' })
+  const reason = decision === 'confirmed' ? '' : await askReason({ title: 'Источник не подходит', text: 'Источник будет отмечен как отклонённый, исходная цитата сохранится в истории. Значение останется, пока его не исправят.', confirm: 'Отклонить источник', placeholder: 'Например: "Число взято из строки другого прибора"' })
   if (reason === null) return
   busy.value = true
   try {
@@ -53,7 +53,7 @@ async function review (decision) {
 }
 async function remove () {
   const id = props.item[ID_FIELD[props.type]]
-  const reason = await askReason({ title: `Удалить запись ${id}?`, text: 'Запись исчезнет из активной версии графа. Прежние версии и аудит сохранят её.', confirm: 'Удалить', tone: 'danger', placeholder: 'Например: дубль результата R3' })
+  const reason = await askReason({ title: `Удалить запись ${id}?`, text: 'Запись исчезнет из активной версии графа. Прежние версии и аудит сохранят её.', confirm: 'Удалить', tone: 'danger', placeholder: 'Например: "Дубль результата R3"' })
   if (reason === null) return
   busy.value = true
   try {

@@ -66,12 +66,12 @@ function demoLogin (who) {
       <p class="login__lead">Учётные записи выдаёт администратор сервиса.</p>
       <form class="login__fields" novalidate @submit.prevent="submit">
         <label class="field">
-          <span class="field__label">Почта</span>
-          <input v-model="email" class="input" type="email" autocomplete="username" inputmode="email" :aria-invalid="!!error">
+          <span class="field__label">Почта<span class="field__req" aria-hidden="true">*</span></span>
+          <input v-model="email" class="input" type="email" aria-required="true" autocomplete="username" inputmode="email" :aria-invalid="!!error">
         </label>
         <label class="field">
-          <span class="field__label">Пароль</span>
-          <input v-model="password" class="input" type="password" autocomplete="current-password" :aria-invalid="!!error">
+          <span class="field__label">Пароль<span class="field__req" aria-hidden="true">*</span></span>
+          <input v-model="password" class="input" type="password" aria-required="true" autocomplete="current-password" :aria-invalid="!!error">
         </label>
         <p v-if="error" class="field__error" role="alert">{{ error }}</p>
         <button class="btn btn--primary btn--lg btn--block" type="submit" :disabled="busy">{{ busy ? 'Вход…' : 'Войти' }}</button>

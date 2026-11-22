@@ -79,20 +79,25 @@ body.ui {
 
 /* ---------- поля: залитые полкой, без рамки; фокус зелёной рамкой */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.field__label { font-size: 13px; font-weight: 500; color: var(--ink); }
+.field__label { font-size: 13px; font-weight: 600; color: var(--ink); }
+/* обязательное поле: звёздочка после названия; необязательное ничем не отмечено */
+.field__req { margin-left: 2px; color: var(--danger); font-weight: 600; }
 .field__hint { font-size: var(--t-12); line-height: 16px; color: var(--pencil); }
 .field__error { font-size: var(--t-12); line-height: 16px; color: var(--danger); }
+/* поле ввода: серая рамка сразу, при выборе рамка светлеет до цвета текста (белая в тёмной теме, чёрная в светлой);
+   введённый текст обычного начертания */
 .input, .select, .textarea {
-  width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: 6px;
-  background: var(--shelf); color: var(--ink); font-size: var(--t-14);
-  box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 140ms var(--ease), background-color 140ms var(--ease);
+  width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--field-line); border-radius: 6px;
+  background: transparent; color: var(--ink); font-size: var(--t-14); font-weight: 400;
+  transition: border-color 140ms var(--ease);
 }
 .textarea { height: auto; min-height: 72px; padding: 8px 12px; line-height: 20px; resize: vertical; }
 .select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--pencil) 50%), linear-gradient(135deg, var(--pencil) 50%, transparent 50%); background-position: calc(100% - 15px) 52%, calc(100% - 11px) 52%; background-size: 4px 4px; background-repeat: no-repeat; }
 .input::placeholder, .textarea::placeholder { color: var(--pencil); }
-.input:hover, .select:hover, .textarea:hover { box-shadow: inset 0 0 0 1px var(--rule-mid); }
-.input:focus, .select:focus, .textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--source); }
-.input[aria-invalid="true"], .textarea[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--red); }
+.input:hover, .select:hover, .textarea:hover { border-color: var(--field-hover); }
+.input:focus, .select:focus, .textarea:focus, .input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: none; border-color: var(--ink); }
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--danger); }
+.input:disabled, .select:disabled, .textarea:disabled { opacity: .5; }
 .input--sm, .select--sm { height: 30px; font-size: 13px; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-14); }
 .check input[type="checkbox"], .cb {
@@ -116,6 +121,22 @@ body.ui {
 .chip--error { color: var(--danger); font-weight: 600; }
 .chip--run { color: var(--accent-text); }
 .chip--run::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent); border-top-color: currentColor; animation: ui-spin 800ms linear infinite; }
+/* статусы документов с точкой (как в прошлой версии): обычные состояния без рамки, точка и слово;
+   рамка и заливка у того, что ждёт человека или сломалось; идущая работа в зелёной плашке с вращением */
+.chip--dot { gap: 6px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 13px; font-weight: 500; line-height: 1; color: var(--pencil); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink) 15%, transparent); }
+.chip--dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .6; flex: none; }
+.chip--dot.chip--ok, .chip--dot.chip--off, .chip--dot.chip--idle { padding: 0; font-weight: 500; box-shadow: none; }
+.chip--dot.chip--ok { color: var(--pencil); }
+.chip--dot.chip--ok::before { background: #07854A; opacity: 1; }
+.chip--dot.chip--off, .chip--dot.chip--idle { color: color-mix(in oklab, var(--pencil) 80%, var(--desk)); }
+.chip--dot.chip--run { color: var(--accent-text); background: color-mix(in oklab, #07854A 13%, var(--desk)); box-shadow: inset 0 0 0 1px color-mix(in oklab, #07854A 22%, transparent); }
+.chip--dot.chip--run::before { width: 8px; height: 8px; border-radius: 50%; background: none; opacity: 1; border: 1.5px solid color-mix(in oklab, currentColor 30%, transparent); border-top-color: currentColor; animation: ui-spin 800ms linear infinite; }
+.chip--dot.chip--wait { color: var(--ink); font-weight: 500; background: color-mix(in oklab, var(--ink) 7%, var(--desk)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink) 15%, transparent); }
+.chip--dot.chip--wait::before { background: var(--ink); opacity: 1; }
+.chip--dot.chip--warn { color: var(--ink); font-weight: 500; }
+.chip--dot.chip--warn::before { background: var(--ochre); opacity: 1; }
+.chip--dot.chip--error { color: var(--ink); font-weight: 500; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 45%, transparent); }
+.chip--dot.chip--error::before { background: var(--red); opacity: 1; }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 
 .count { font-weight: 500; color: var(--pencil); font-variant-numeric: tabular-nums; }
@@ -134,6 +155,8 @@ body.ui {
   background: var(--desk); position: sticky; top: 0; z-index: 1;
 }
 .table td { height: 44px; padding: 6px 12px; vertical-align: middle; }
+/* названия колонок во всех таблицах по центру колонки */
+.table thead th, .table thead .t-num, .table thead .t-act, .table thead .t-check { text-align: center; }
 .table tbody tr:last-child td { box-shadow: inset 0 -1.5px 0 var(--rule-strong); }
 .table tbody tr { transition: background-color 120ms var(--ease); }
 .table tbody tr.is-link { cursor: pointer; }
@@ -189,7 +212,8 @@ body.ui {
   background: var(--desk); box-shadow: inset 0 -1px 0 var(--rule);
 }
 .bar__brand { display: flex; align-items: center; gap: 10px; flex: none; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
-.bar__nav { display: flex; align-self: stretch; gap: 22px; }
+/* разделы корпуса равномерно по строке между выбором корпуса и поиском */
+.bar__nav { display: flex; flex: 1; justify-content: space-evenly; align-self: stretch; gap: 22px; min-width: 0; }
 .bar__tab { position: relative; display: flex; align-items: center; gap: 6px; color: var(--pencil); font-weight: 500; white-space: nowrap; transition: color 140ms var(--ease); }
 .bar__tab:hover { color: var(--ink); }
 .bar__tab.router-link-active, .bar__tab.is-on { color: var(--ink); }

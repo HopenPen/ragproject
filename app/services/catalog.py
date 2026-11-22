@@ -358,13 +358,13 @@ class Catalog:
                             device = next((d for d in graph['devices'] if d['device_id']==record['device_id']),{})
                             material = next((m for m in graph['materials'] if m['material_id']==(record['material_id'] or device.get('absorber_material_id'))),{})
                             measurement = next((m for m in graph['measurements'] if m['measurement_id']==record['measurement_id']),{})
-                            for entity,fields in ((device,('device_type','architecture','active_area','area_definition')),
+                            for entity,fields in ((device,('device_label','device_type','architecture','active_area','area_unit','area_definition')),
                                                   (material,('material_class','formula_normalized')),
-                                                  (measurement,('scan_direction','certified','spectrum'))):
+                                                  (measurement,('measurement_type','scan_direction','certified','spectrum','light_intensity','intensity_unit','temperature'))):
                                 context.update({field:entity.get(field) for field in fields})
                         else:
                             for collection,key,fields in (
-                                ('configurations','config_id',('rag_variant','retrieval_method','embedding_model','generator_model','top_k')),
+                                ('configurations','config_id',('rag_variant','retrieval_method','embedding_model','generator_model','top_k','chunk_size','reranker_model')),
                                 ('datasets','dataset_id',('dataset_name','dataset_version','data_split','language')),
                                 ('tasks','task_id',('task_type',))):
                                 entity = next((e for e in graph[collection] if e[key]==record[key]),{})

@@ -14,8 +14,8 @@ function submit () {
     <form id="reason-form" class="stack" @submit.prevent="submit">
       <p v-if="dialog.text" class="muted">{{ dialog.text }}</p>
       <label v-if="dialog.withReason" class="field">
-        <span class="field__label">{{ dialog.reasonLabel }}<span v-if="!dialog.reasonRequired" class="muted">, необязательно</span></span>
-        <textarea v-model="dialog.value" class="textarea" rows="3" :placeholder="dialog.placeholder" autofocus @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit" />
+        <span class="field__label">{{ dialog.reasonLabel }}<span v-if="dialog.reasonRequired" class="field__req" aria-hidden="true">*</span></span>
+        <textarea v-model="dialog.value" class="textarea" rows="3" :placeholder="dialog.placeholder" :aria-required="dialog.reasonRequired ? 'true' : null" autofocus @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit" />
         <span class="field__hint">Попадёт в историю версий вместе с вашим именем.</span>
       </label>
     </form>

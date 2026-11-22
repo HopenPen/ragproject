@@ -110,13 +110,13 @@ const topicWord = d => { const l = d.classification?.labels || []; return l.incl
   <div class="page docs">
     <div class="page__head">
       <h1 class="page__title">Документы</h1>
-      <div class="tabs docs__filters" role="tablist" aria-label="Фильтр по статусу">
+      <div v-if="list.length" class="tabs docs__filters" role="tablist" aria-label="Фильтр по статусу">
         <button v-for="(g, k) in GROUPS" v-show="k === 'all' || counts[k]" :key="k" type="button" role="tab" class="tab" :class="{ 'is-on': filter === k }" :aria-selected="filter === k" @click="filter = k">
           {{ g.label }}<span class="tab__n">{{ counts[k] }}</span>
         </button>
       </div>
       <span class="grow" />
-      <template v-if="editable && !ui.mobile">
+      <template v-if="editable && !ui.mobile && list.length">
         <template v-if="selected.size">
           <span class="docs__picked">Выбрано {{ selected.size }}</span>
           <button class="btn btn--ghost" type="button" @click="selected.clear()">Снять выбор</button>
@@ -124,7 +124,7 @@ const topicWord = d => { const l = d.classification?.labels || []; return l.incl
           <button class="btn btn--primary" type="button" @click="run('process')">Обработать</button>
         </template>
         <template v-else>
-          <button class="btn btn--ghost" type="button" :disabled="!list.length" @click="run('process')">Обработать все</button>
+          <button class="btn btn--ghost" type="button" @click="run('process')">Обработать все</button>
           <button class="btn btn--accent" type="button" @click="uploadOpen = true"><Upload />Загрузить PDF</button>
         </template>
       </template>
@@ -162,7 +162,7 @@ const topicWord = d => { const l = d.classification?.labels || []; return l.incl
           </td>
           <td class="docs__topic">{{ topicWord(d) }}</td>
           <td class="docs__st">
-            <Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" />
+            <Chip dot :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" />
             <span v-if="d.status === 'processing' && d.processing" class="docs__stage">{{ STAGE[d.processing.stage] }}<template v-if="d.processing.progress?.total && ['text', 'extract'].includes(d.processing.stage)">, {{ d.processing.progress.done }} из {{ d.processing.progress.total }}</template></span>
             <button v-if="d.status === 'blocked' && editable" class="btn btn--sm docs__retry" type="button" :disabled="retrying.has(d.id)" @click.stop="retryBlocked(d)">Повторить задание</button>
           </td>
@@ -176,7 +176,7 @@ const topicWord = d => { const l = d.classification?.labels || []; return l.incl
     <ul v-else class="docs__list">
       <li v-for="d in shown" :key="d.id">
         <button type="button" class="docs__row" @click="open(d)">
-          <span class="docs__line"><b>{{ d.publication_code }}</b><Chip :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" /></span>
+          <span class="docs__line"><b>{{ d.publication_code }}</b><Chip dot :tone="DOC_STATUS[d.status]?.tone" :text="DOC_STATUS[d.status]?.text || d.status" /></span>
           <span class="docs__title">{{ d.title || d.original_filename }}</span>
           <span v-if="d.status_hint" class="docs__hint">{{ d.status_hint }}</span>
         </button>

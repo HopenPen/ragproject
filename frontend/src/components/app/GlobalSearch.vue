@@ -77,11 +77,11 @@ function expand () { expanded.value = true; setTimeout(() => input.value?.focus(
 
 <style>
 .gsearch { position: relative; }
-.gsearch__box { display: flex; align-items: center; gap: 8px; width: 260px; height: 34px; padding: 0 6px 0 11px; border-radius: 6px; background: var(--shelf); cursor: text; box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 140ms var(--ease); }
-.gsearch__box:hover { box-shadow: inset 0 0 0 1px var(--rule-mid); }
-.gsearch__box:focus-within { box-shadow: inset 0 0 0 2px var(--source); }
+.gsearch__box { display: flex; align-items: center; gap: 8px; width: 260px; height: 34px; padding: 0 6px 0 11px; border: 1px solid var(--field-line); border-radius: 6px; background: transparent; cursor: text; transition: border-color 140ms var(--ease); }
+.gsearch__box:hover { border-color: var(--field-hover); }
+.gsearch__box:focus-within { border-color: var(--ink); }
 .gsearch__icon { width: 15px !important; height: 15px !important; color: var(--pencil); flex: none; }
-.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); }
+.gsearch__input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--ink); font-weight: 400; }
 .gsearch__input::placeholder { color: var(--pencil); }
 .gsearch__input::-webkit-search-cancel-button { display: none; }
 .gsearch__panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 45; width: min(560px, 92vw); max-height: 70vh; overflow: auto; padding: 6px; background: var(--float); border-radius: 10px; box-shadow: var(--shadow); }

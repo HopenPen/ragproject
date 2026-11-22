@@ -76,8 +76,8 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
 <template>
   <div class="page checks">
     <div class="page__head">
-      <h1 class="page__title">Проверки</h1>
-      <Segmented v-model="tab" :options="[{ value: 'issues', label: 'Замечания', count: counts.issues }, { value: 'queue', label: 'Очередь', count: counts.queue }]" label="Раздел проверок" />
+      <h1 class="page__title">Комментарии</h1>
+      <Segmented v-model="tab" :options="[{ value: 'issues', label: 'Замечания', count: counts.issues }, { value: 'queue', label: 'Заметки', count: counts.queue }]" label="Раздел комментариев" />
       <span class="grow" />
       <template v-if="tab === 'issues'">
         <select v-model="status" class="select select--sm checks__sel" aria-label="Статус замечаний">
@@ -109,15 +109,15 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
 
     <template v-else>
       <div v-if="!queue.length && !loading" class="empty">
-        <h3>Очередь пуста</h3>
+        <h3>Заметок нет</h3>
         <p>Сюда попадают статьи с неуверенной темой, новые версии после повторного извлечения, сомнительные источники и открытые замечания.</p>
       </div>
       <table v-else-if="!ui.mobile" class="table queue">
-        <thead><tr><th class="queue__kind">Что</th><th class="queue__code">Код</th><th>Суть</th><th class="queue__act"><span class="visually-hidden">Действие</span></th></tr></thead>
+        <thead><tr><th class="queue__code">Код</th><th class="queue__kind">Объект</th><th>Комментарий</th><th class="queue__act"><span class="visually-hidden">Действие</span></th></tr></thead>
         <tbody>
           <tr v-for="it in queue" :key="it.id">
-            <td><Chip :tone="KIND_TONE[it.kind]" :text="REVIEW_KIND[it.kind]" /></td>
             <td><b>{{ it.publication_code }}</b></td>
+            <td><Chip :tone="KIND_TONE[it.kind]" :text="REVIEW_KIND[it.kind]" /></td>
             <td class="queue__sub">
               <span class="queue__text">{{ it.summary }}</span>
               <span class="queue__title">{{ it.title }}<template v-if="it.profile">, {{ profileShort(it.profile) }}</template></span>
@@ -149,7 +149,8 @@ const counts = computed(() => ({ issues: ws.corpus?.stats?.issues_open ?? issues
 
 .queue__kind { width: 168px; }
 .queue__code { width: 72px; }
-.queue__act { width: 1%; text-align: right; white-space: nowrap; }
+.queue__act { width: 180px; text-align: center; white-space: nowrap; }
+.queue td.queue__act { padding-left: 12px; padding-right: 0; }
 .queue td { height: 56px; }
 .queue__sub { min-width: 0; }
 .queue__text { display: block; max-width: 72ch; }

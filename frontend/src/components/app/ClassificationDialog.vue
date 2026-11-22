@@ -66,7 +66,7 @@ async function submit () {
         <p v-if="cur.evidence?.[0]" class="cls__where">Стр. {{ cur.evidence[0].page }}</p>
       </div>
       <fieldset class="cls__topics">
-        <legend class="cls__h">Ваше решение</legend>
+        <legend class="field__label cls__legend">Ваше решение</legend>
         <div v-for="t in TOPICS" :key="t.label" class="cls__topic">
           <label class="check"><input v-model="labels" type="checkbox" class="cb" :value="t.label"><span>{{ t.title }}<span class="muted">, {{ t.hint }}</span></span></label>
           <div v-if="labels.includes(t.label)" class="cls__scope">
@@ -77,8 +77,8 @@ async function submit () {
         <p v-if="!labels.length" class="field__hint">Без отмеченных тем статья попадёт в выгрузку только библиографией.</p>
       </fieldset>
       <label class="field">
-        <span class="field__label">Причина<span class="muted">, необязательно</span></span>
-        <textarea v-model="reason" class="textarea" rows="2" placeholder="Например: в разделе 2 есть устройство и J-V, тема подтверждена" />
+        <span class="field__label">Причина</span>
+        <textarea v-model="reason" class="textarea" rows="2" placeholder='Например: "В разделе 2 есть устройство и J-V, тема подтверждена"' />
       </label>
       <p v-if="error" class="field__error" role="alert">{{ error }}</p>
     </div>
@@ -94,6 +94,7 @@ async function submit () {
 <style>
 .cls { gap: 22px; }
 .cls__h { margin-bottom: 8px; color: var(--pencil); }
+.cls__legend { margin-bottom: 10px; }
 .cls__scores { display: flex; gap: 40px; margin-bottom: 12px; }
 .cls__scores div { display: flex; flex-direction: column-reverse; }
 .cls__scores dt { font-size: 13px; line-height: 18px; color: var(--pencil); }

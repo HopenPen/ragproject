@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Trash2 } from '@lucide/vue'
 import Modal from '../components/ui/Modal.vue'
+import RichSelect from '../components/ui/RichSelect.vue'
 import BrandMark from '../components/app/BrandMark.vue'
 import UserMenu from '../components/app/UserMenu.vue'
 import { corpora } from '../api/index.js'
@@ -21,6 +22,10 @@ const form = ref({ name: '', description: '', split: 'dev' })
 const busy = ref(false)
 const fieldError = ref('')
 const canCreate = computed(() => ['editor', 'admin'].includes(session.user?.role))
+const SPLITS = [
+  { value: 'dev', title: 'dev', text: 'настройка и проверка на размеченных статьях' },
+  { value: 'test', title: 'test', text: 'итоговая обработка' }
+]
 const manageable = computed(() => ws.corpora.some(c => canManage(c)))
 const deleting = ref(new Set())
 async function remove (corpus) {
@@ -74,7 +79,7 @@ async function create () {
         <tbody>
           <tr v-for="c in ws.corpora" :key="c.id" class="is-link" @click="router.push(`/corpora/${c.id}/documents`)">
             <td class="corpora__main">
-              <RouterLink :to="`/corpora/${c.id}/documents`" class="corpora__name" @click.stop>{{ c.name }}</RouterLink><span v-if="c.status === 'archived'" class="corpora__arch">, в архиве</span>
+              <RouterLink :to="`/corpora/${c.id}/documents`" class="corpora__name" @click.stop>{{ c.name }}</RouterLink>
               <span v-if="c.description" class="corpora__desc">{{ c.description }}</span>
             </td>
             <td class="muted">{{ c.split }}</td>
@@ -99,22 +104,18 @@ async function create () {
     <Modal :open="createOpen" title="Новый корпус" @close="createOpen = false">
       <form id="corpus-form" class="stack" style="gap: 16px" @submit.prevent="create">
         <label class="field">
-          <span class="field__label">Название</span>
-          <input v-model="form.name" class="input" autofocus :aria-invalid="!!fieldError" placeholder="Например, Dev-набор ноябрь">
+          <span class="field__label">Название<span class="field__req" aria-hidden="true">*</span></span>
+          <input v-model="form.name" class="input" autofocus aria-required="true" :aria-invalid="!!fieldError" placeholder='Например: "Dev-набор ноябрь"'>
           <span v-if="fieldError" class="field__error">{{ fieldError }}</span>
         </label>
         <label class="field">
-          <span class="field__label">Описание<span class="muted">, необязательно</span></span>
+          <span class="field__label">Описание</span>
           <textarea v-model="form.description" class="textarea" rows="2" />
         </label>
-        <label class="field">
-          <span class="field__label">Набор</span>
-          <select v-model="form.split" class="select">
-            <option value="dev">dev: настройка и проверка на размеченных статьях</option>
-            <option value="test">test: итоговая обработка</option>
-          </select>
-          <span class="field__hint">После загрузки статей набор не меняется.</span>
-        </label>
+        <div class="field">
+          <span id="corpus-split" class="field__label">Набор<span class="field__req" aria-hidden="true">*</span></span>
+          <RichSelect v-model="form.split" labelledby="corpus-split" :options="SPLITS" />
+        </div>
       </form>
       <template #footer>
         <button class="btn btn--ghost" type="button" @click="createOpen = false">Отмена</button>
@@ -131,7 +132,6 @@ async function create () {
 .corpora__main { min-width: 0; max-width: 560px; }
 .corpora__name { font-weight: 600; color: var(--ink); text-decoration: none; }
 .corpora__name:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
-.corpora__arch { color: var(--pencil); }
 .corpora__desc { display: block; color: var(--pencil); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mcorp { box-shadow: inset 0 1.5px 0 var(--rule-strong); }
 .mcorp li + li { box-shadow: inset 0 1px 0 var(--rule); }

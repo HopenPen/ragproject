@@ -12,7 +12,7 @@ import { ws, kickJobs } from '../stores/workspace.js'
 import { canEdit } from '../stores/session.js'
 import { notify } from '../stores/toasts.js'
 import { JOB_STATUS, STAGE, TERMINAL, profileShort, ruleLabel } from '../lib/labels.js'
-import { fmtDate, fmtBytes, countText } from '../lib/format.js'
+import { fmtDate, fmtBytes, fmtUnit, countText } from '../lib/format.js'
 
 const router = useRouter()
 const profiles = ref(['solar-v1', 'rag-v1'])
@@ -52,6 +52,13 @@ const tables = computed(() => {
 })
 const active = j => !TERMINAL.has(j.status)
 const value = j => j.progress?.total ? j.progress.done / j.progress.total : null
+// колонка «Измерения» паспорта: единица поля или число допустимых значений словаря
+function measureOf (f) {
+  const parts = []
+  if (f.unit) parts.push(fmtUnit(f.unit))
+  if (f.vocabulary?.length) parts.push(countText(f.vocabulary.length, ['допустимое значение', 'допустимых значения', 'допустимых значений']))
+  return parts.join(', ')
+}
 // состав архива строками: папка и её файлы, файлы корня архива отдельной строкой в конце
 function groupsOf (j) {
   const groups = new Map()
@@ -74,27 +81,27 @@ onMounted(() => kickJobs())
     <div class="exp__grid">
       <section class="exp__form" aria-labelledby="exp-new">
         <h2 id="exp-new">Новая выгрузка</h2>
-        <fieldset class="exp__set">
-          <legend>Профили</legend>
+        <div class="exp__set" role="group" aria-labelledby="exp-g-prof" aria-required="true">
+          <p id="exp-g-prof" class="field__label exp__legend">Профили<span class="field__req" aria-hidden="true">*</span></p>
           <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="solar-v1">Солнечные элементы</label>
           <label class="check"><input v-model="profiles" type="checkbox" class="cb" value="rag-v1">RAG-системы</label>
-        </fieldset>
-        <fieldset class="exp__set">
-          <legend>Режим</legend>
+        </div>
+        <div class="exp__set" role="radiogroup" aria-labelledby="exp-g-mode">
+          <p id="exp-g-mode" class="field__label exp__legend">Режим</p>
           <label class="exp__mode"><input v-model="mode" type="radio" class="rb" value="strict"><span><b>Строгая</b>Только принятые статьи и значения с источником</span></label>
           <label class="exp__mode"><input v-model="mode" type="radio" class="rb" value="incomplete"><span><b>С пропусками</b>Всё готовое, пропуски перечислены в manifest.json</span></label>
-        </fieldset>
-        <fieldset class="exp__set">
-          <legend>Перед сборкой</legend>
+        </div>
+        <div class="exp__set" role="group" aria-labelledby="exp-g-opt">
+          <p id="exp-g-opt" class="field__label exp__legend">Параметры</p>
           <label class="check"><input v-model="checkSources" type="checkbox" class="cb">Сверить источники значений</label>
           <label class="check" :class="{ 'is-off': !profiles.includes('solar-v1') }"><input v-model="checker" type="checkbox" class="cb" :disabled="!profiles.includes('solar-v1')">Внешний checker для solar</label>
-        </fieldset>
+        </div>
         <button class="btn btn--accent btn--block btn--lg" type="button" :disabled="busy || !editable || !profiles.length" @click="create()">Собрать выгрузку</button>
         <p v-if="!editable" class="exp__note">Собирать выгрузку может редактор корпуса.</p>
       </section>
 
       <section class="exp__list" aria-labelledby="exp-list">
-        <h2 id="exp-list">Архивы корпуса</h2>
+        <h2 id="exp-list">Выгрузка обработанных данных</h2>
         <div v-if="!exports.length" class="empty"><p>Выгрузок пока не было. Настройте состав слева и соберите первый архив.</p></div>
         <ol v-else class="exp__jobs">
           <li v-for="j in exports" :key="j.id" class="exp__job">
@@ -120,7 +127,6 @@ onMounted(() => kickJobs())
               <div class="exp__actions">
                 <button class="btn btn--primary btn--sm" type="button" @click="download(j)"><Download />Скачать ZIP</button>
                 <button class="btn btn--ghost btn--sm" type="button" @click="show(j, 'passport')">Паспорт данных</button>
-                <button class="btn btn--ghost btn--sm" type="button" @click="show(j, 'report')">Отчёт проверки</button>
               </div>
             </template>
             <template v-else-if="j.status === 'failed'">
@@ -143,9 +149,9 @@ onMounted(() => kickJobs())
         <section v-for="t in tables" :key="t.profile + t.file" class="pass">
           <h3>{{ t.file }}<span class="pass__sub">{{ profileShort(t.profile) }}, ключ <code>{{ t.id_field }}</code></span></h3>
           <table class="table pass__table">
-            <thead><tr><th>Поле</th><th>Тип</th><th>Единица</th><th>Обязательное</th><th>Ссылка</th></tr></thead>
+            <thead><tr><th>Поле</th><th>Тип</th><th>Измерения</th><th>Обязательное</th><th>Ссылка</th></tr></thead>
             <tbody>
-              <tr v-for="f in t.fields" :key="f.name"><td><code>{{ f.name }}</code></td><td>{{ f.type }}<span v-if="f.vocabulary" class="muted" :title="f.vocabulary.join(', ')">, словарь {{ f.vocabulary.length }}</span></td><td>{{ f.unit || '' }}</td><td>{{ f.required ? 'да' : '' }}</td><td><code v-if="f.references">{{ f.references }}</code></td></tr>
+              <tr v-for="f in t.fields" :key="f.name"><td><code>{{ f.name }}</code></td><td>{{ f.type }}</td><td :title="f.vocabulary ? f.vocabulary.join(', ') : null">{{ measureOf(f) }}</td><td>{{ f.required ? 'да' : '' }}</td><td><code v-if="f.references">{{ f.references }}</code></td></tr>
             </tbody>
           </table>
         </section>
@@ -173,8 +179,11 @@ onMounted(() => kickJobs())
 .exp__grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 56px; align-items: start; max-width: 1180px; }
 .exp h2 { font-size: var(--t-17); line-height: 24px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 14px; }
 .exp__form { position: sticky; top: 80px; }
-.exp__set { border: 0; margin: 0 0 22px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.exp__set legend { margin-bottom: 10px; color: var(--pencil); }
+.exp__set { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+/* разделы настроек разделены линией и воздухом */
+.exp__set + .exp__set { padding-top: 24px; box-shadow: inset 0 1px 0 var(--rule-mid); }
+.exp__set:last-of-type { margin-bottom: 30px; }
+.exp__legend { margin-bottom: 4px; font-size: var(--t-14); line-height: 20px; }
 .exp__mode { display: flex; gap: 10px; cursor: pointer; }
 .exp__mode .rb { margin-top: 2px; }
 .exp__mode > span { display: flex; flex-direction: column; color: var(--pencil); font-size: 13px; line-height: 18px; }
@@ -204,9 +213,11 @@ onMounted(() => kickJobs())
 .pass { margin-bottom: 28px; }
 .pass h3 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: var(--t-14); line-height: 20px; font-weight: 600; margin-bottom: 8px; }
 .pass__sub { font-weight: 400; color: var(--pencil); }
-.pass__table td, .pass__table th { height: 34px; font-size: 13px; }
+.pass__table td, .pass__table th { height: 34px; font-size: 13px; text-align: center; font-weight: 400; }
+.pass__table code { font-weight: 400; }
 .exp code, .drawer code { font-family: var(--mono); font-size: 12.5px; }
 .rep { margin-bottom: 24px; }
 .rep__rules td { height: 40px; }
+.rep__rules th, .rep__rules td, .rep__rules .t-num { text-align: center; }
 @media (max-width: 1100px) { .exp__grid { grid-template-columns: 1fr; gap: 32px; } .exp__form { position: static; max-width: 420px; } }
 </style>

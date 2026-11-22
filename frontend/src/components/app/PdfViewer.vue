@@ -110,6 +110,10 @@ async function renderPage (n) {
   const vp = page.getViewport({ scale: scale.value * dpr })
   canvas.width = Math.floor(vp.width)
   canvas.height = Math.floor(vp.height)
+  // контекст с прозрачностью создаётся до pdf.js: иначе до первой отрисовки страница мелькает чёрным
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   try {
     await page.render({ canvas, viewport: vp }).promise
   } catch { rendered.delete(n) }
@@ -374,7 +378,7 @@ defineExpose({ scrollToFocus })
         </div>
         <aside v-if="margin" class="pdfv__margin">
           <div v-if="$slots.note && activeId" :key="`note-${activeId}`" class="pdfv__note" :class="{ 'is-loose': !activeBox }" :style="noteStyle"><slot name="note" /></div>
-          <p v-else-if="!loading" class="pdfv__hint">Нажмите на число на странице или в списке справа: здесь появится заметка с условиями и источником.</p>
+          <p v-else-if="!loading" class="pdfv__hint">Выберите пункт справа, чтобы появилась заметка с условиями и источниками.</p>
         </aside>
       </div>
     </div>

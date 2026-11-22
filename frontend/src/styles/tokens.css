@@ -58,6 +58,8 @@
   --rule-mid: color-mix(in oklab, var(--ink) 30%, transparent);
   --rule-strong: color-mix(in oklab, var(--ink) 62%, transparent);
   --hover: color-mix(in oklab, var(--ink) 4.5%, var(--desk));
+  --field-line: color-mix(in oklab, var(--ink) 26%, transparent);
+  --field-hover: color-mix(in oklab, var(--ink) 44%, transparent);
   --picked: color-mix(in oklab, var(--source) 12%, var(--desk));
   --faint: var(--pencil);          /* третьего серого нет: всё вторичное пишется карандашом */
   --shadow: 0 1px 2px var(--shade), 0 18px 48px -12px var(--shade);

@@ -11,7 +11,8 @@ import { catalog } from '../api/index.js'
 import { ws } from '../stores/workspace.js'
 import { notify } from '../stores/toasts.js'
 import { profileTitle, valueLabel } from '../lib/labels.js'
-import { fmtNum, fmtResult, countText } from '../lib/format.js'
+import { fmtResult, countText } from '../lib/format.js'
+import { resultDevice, resultConditions, resultSetup } from '../lib/rowline.js'
 
 const router = useRouter()
 const profile = ref('solar-v1')
@@ -63,15 +64,7 @@ const filtered = computed(() => q.value || metric.value || aggregation.value || 
 function open (r) {
   router.push({ name: 'article', params: { corpusId: ws.corpus.id, documentId: r.document_id }, query: { profile: r.profile, record: r.result_id } })
 }
-function conditions (r) {
-  const c = r.context
-  if (r.profile === 'solar-v1') {
-    return [c.spectrum && c.intensity ? `${c.spectrum}, ${fmtNum(c.intensity)} мВт/см²` : null, c.area ? `${fmtNum(c.area)} см²` : null, c.scan_direction ? `${valueLabel('scan_direction', c.scan_direction)}` : (c.measurement_type === 'J-V' ? 'развёртка не указана' : null), c.certified ? 'сертифицировано' : null].filter(Boolean).join(', ')
-  }
-  return [c.retrieval, c.chunk_size ? `фрагмент ${c.chunk_size}` : null, c.top_k !== null && c.top_k !== undefined ? `top_k ${c.top_k}` : null, c.reranker].filter(Boolean).join(', ')
-}
 const isSolar = computed(() => profile.value === 'solar-v1')
-const ctxText = r => isSolar.value ? [r.context.device, conditions(r)].filter(Boolean).join(', ') : [r.context.config, r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ')
 const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '↓') : ''
 </script>
 
@@ -109,12 +102,13 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
           <th class="res__c-pub"><button class="th-sort" :class="{ 'is-on': sort.key === 'publication_code' }" type="button" @click="sortBy('publication_code')">Статья<span class="th-sort__dir">{{ arrow('publication_code') }}</span></button></th>
           <th><button class="th-sort" :class="{ 'is-on': sort.key === 'metric_name' }" type="button" @click="sortBy('metric_name')">{{ isSolar ? 'Показатель' : 'Метрика' }}<span class="th-sort__dir">{{ arrow('metric_name') }}</span></button></th>
           <th class="t-num"><button class="th-sort" :class="{ 'is-on': sort.key === 'metric_value' }" type="button" @click="sortBy('metric_value')">Значение<span class="th-sort__dir">{{ arrow('metric_value') }}</span></button></th>
-          <th class="res__c-ctx">{{ isSolar ? 'Прибор и условия' : 'Конфигурация и данные' }}</th>
+          <th v-if="isSolar" class="res__c-dev">Прибор</th>
+          <th class="res__c-ctx">{{ isSolar ? 'Условия измерения' : 'Конфигурация и данные' }}</th>
           <th class="res__c-src">Источник</th>
         </tr>
       </thead>
       <tbody v-if="loading && !rows.length">
-        <tr v-for="i in 8" :key="i"><td /><td><span class="skeleton" style="width: 64px; height: 14px" /></td><td><span class="skeleton" style="width: 48px; height: 14px" /></td><td class="t-num"><span class="skeleton" style="width: 56px; height: 14px; margin-left: auto" /></td><td><span class="skeleton" style="width: 60%; height: 14px" /></td><td><span class="skeleton" style="width: 64px; height: 14px" /></td></tr>
+        <tr v-for="i in 8" :key="i"><td /><td><span class="skeleton" style="width: 64px; height: 14px" /></td><td><span class="skeleton" style="width: 48px; height: 14px" /></td><td class="t-num"><span class="skeleton" style="width: 56px; height: 14px; margin-left: auto" /></td><td v-if="isSolar"><span class="skeleton" style="width: 80px; height: 14px" /></td><td><span class="skeleton" style="width: 60%; height: 14px" /></td><td><span class="skeleton" style="width: 64px; height: 14px" /></td></tr>
       </tbody>
       <tbody v-else>
         <tr v-for="r in rows" :key="key(r)" class="is-link" :class="{ 'is-selected': selected.has(key(r)) }" @click="open(r)">
@@ -125,7 +119,9 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
             <span class="res__val" :class="{ flag: r.issues_open }" :title="r.issues_open ? `Открытых замечаний: ${r.issues_open}` : null">{{ fmtResult(r) }}</span>
             <span v-if="r.issues_open" class="visually-hidden">, есть замечания</span>
           </td>
-          <td class="res__ctx" :title="ctxText(r)"><span class="res__dev">{{ isSolar ? r.context.device : (r.context.config || '–') }}</span><span class="res__cond">{{ isSolar ? conditions(r) : [r.context.retrieval, r.context.dataset, r.context.split].filter(Boolean).join(', ') }}</span></td>
+          <td v-if="isSolar" class="res__dev">{{ resultDevice(r) }}</td>
+          <td v-if="isSolar" class="res__ctx" :title="resultConditions(r)">{{ resultConditions(r) }}</td>
+          <td v-else class="res__ctx" :title="[resultSetup(r).head, resultSetup(r).rest].filter(Boolean).join(', ')"><span class="res__dev">{{ resultSetup(r).head }}</span><span class="res__cond">{{ resultSetup(r).rest }}</span></td>
           <td class="nowrap res__src"><template v-if="r.source.has_evidence">стр. {{ r.source.page }}<template v-if="r.source.table">, {{ r.source.table }}</template><template v-else-if="r.source.figure">, {{ r.source.figure }}</template></template><span v-else class="res__nosrc">без источника</span></td>
         </tr>
       </tbody>
@@ -163,15 +159,17 @@ const arrow = k => sort.value.key === k ? (sort.value.dir === 'asc' ? '↑' : '�
 .res__c-src { width: 150px; }
 .res__id { margin-left: 8px; color: var(--pencil); }
 .res__cited { margin-left: 8px; font-size: 13px; color: var(--pencil); }
-.res__val { font-weight: 600; }
+.res__val { font-weight: 400; }
 .res__ctx { max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res__c-dev { width: 170px; }
+.res__dev { white-space: nowrap; }
+td.res__ctx { color: var(--ink); }
 .res__cond { margin-left: 8px; color: var(--pencil); }
 .res__src { color: var(--pencil); font-size: 13px; }
 .res__nosrc { color: var(--danger); }
 .th-sort { display: inline-flex; align-items: baseline; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
 .th-sort:hover, .th-sort.is-on { color: var(--ink); }
 .th-sort__dir { min-width: .6em; }
-.t-num .th-sort { flex-direction: row-reverse; }
 .selbar { position: fixed; left: 50%; bottom: 24px; z-index: 35; display: flex; align-items: center; gap: 8px; width: min(560px, calc(100vw - 32px)); padding: 8px 8px 8px 18px; transform: translateX(-50%); background: var(--float); color: var(--ink); border-radius: 10px; box-shadow: var(--shadow); }
 .selbar__n { font-weight: 600; }
 .selbar-enter-active, .selbar-leave-active { transition: opacity 180ms var(--ease), transform 260ms var(--spring); }
